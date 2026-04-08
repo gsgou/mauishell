@@ -12,7 +12,10 @@ public static class MauiAppBuilderExtensions
         
         if (!builder.Services.Any(x => x.ImplementationType == typeof(ShinyShellNavigator)))
         {
-            builder.Services.AddSingleton<IMainThread, MauiMainThread>();
+            builder.Services.AddSingleton(navBuilder);
+            builder.Services.TryAddSingleton<IMainThread, MauiMainThread>();
+            builder.Services.TryAddSingleton<IDialogs, ShellDialogs>();
+            
             builder.Services.AddSingleton<ShellServices>();
             builder.Services.AddSingleton<ShinyShellNavigator>();
             builder.Services.AddSingleton<INavigator>(
@@ -21,8 +24,6 @@ public static class MauiAppBuilderExtensions
             builder.Services.AddSingleton<IMauiInitializeService>(
                 sp => sp.GetRequiredService<ShinyShellNavigator>()
             );
-            builder.Services.TryAddSingleton<IDialogs, ShellDialogs>();
-            builder.Services.AddSingleton(navBuilder);
         }
         
         return builder;
