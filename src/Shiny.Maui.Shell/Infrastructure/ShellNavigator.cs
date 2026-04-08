@@ -8,6 +8,7 @@ namespace Shiny.Infrastructure;
 public class ShinyShellNavigator(
     ILogger<ShinyShellNavigator> logger,
     IApplication application,
+    IMainThread mainThread,
     IServiceProvider services,
     ShinyAppBuilder navBuilder
 ) : INavigator, IMauiInitializeService, IDisposable
@@ -94,7 +95,7 @@ public class ShinyShellNavigator(
 
 
     public Task NavigateTo(string uri, params IEnumerable<(string Key, object Value)> args) =>
-        MainThread.InvokeOnMainThreadAsync(() =>
+        mainThread.InvokeOnMainThreadAsync(() =>
         {
             var shell = Shell.Current;
             var parameters = args.ToDictionary(x => x.Key, x => x.Value);
@@ -157,7 +158,7 @@ public class ShinyShellNavigator(
 
             ShinyRouteFactory.PageResolved += handler;
             this.isProgrammaticNavigation = true;
-            await MainThread.InvokeOnMainThreadAsync(() => Shell.Current.GoToAsync(route, true, parameters));
+            await mainThread.InvokeOnMainThreadAsync(() => Shell.Current.GoToAsync(route, true, parameters));
             await tcs.Task.ConfigureAwait(false);
         }
         finally
@@ -215,7 +216,7 @@ public class ShinyShellNavigator(
         // native window (UIWindow on iOS) into a clean state — avoiding the crash in
         // ShellFlyoutRenderer.ViewDidLoad that occurs when a new Shell handler is
         // created while the old Shell's native view hierarchy is still active.
-        await MainThread.InvokeOnMainThreadAsync(() =>
+        await mainThread.InvokeOnMainThreadAsync(() =>
         {
             var window = app.Windows[0];
             if (window.Page?.Handler is IElementHandler oldHandler)
@@ -230,7 +231,7 @@ public class ShinyShellNavigator(
         await Task.Delay(50).ConfigureAwait(false);
 
         // Now set the actual Shell in a clean window state
-        await MainThread.InvokeOnMainThreadAsync(() =>
+        await mainThread.InvokeOnMainThreadAsync(() =>
         {
             var window = app.Windows[0];
             window.Page = shell;
@@ -246,7 +247,7 @@ public class ShinyShellNavigator(
     }
 
 
-    Task DoGoBack(int backCount, NavigationType navType, IEnumerable<(string Key, object Value)> args) => MainThread.InvokeOnMainThreadAsync(() =>
+    Task DoGoBack(int backCount, NavigationType navType, IEnumerable<(string Key, object Value)> args) => mainThread.InvokeOnMainThreadAsync(() =>
     {
         if (backCount < 1)
             throw new ArgumentException("Back count must be 1 or more");
