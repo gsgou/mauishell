@@ -5,6 +5,7 @@ public interface IMainThread
     Task InvokeOnMainThreadAsync(Action action);
     Task InvokeOnMainThreadAsync(Func<Task> func);
     Task<T> InvokeOnMainThreadAsync<T>(Func<Task<T>> func);
+    void BeginInvokeOnMainThread(Action action);
 }
 
 public class MauiMainThread : IMainThread
@@ -43,6 +44,18 @@ public class MauiMainThread : IMainThread
         else
         {
             return MainThread.InvokeOnMainThreadAsync(func);
+        }
+    }
+
+    public void BeginInvokeOnMainThread(Action action)
+    {
+        if (OperatingSystem.IsLinux() || OperatingSystem.IsMacOS())
+        {
+            action.Invoke();
+        }
+        else
+        {
+            MainThread.BeginInvokeOnMainThread(action);
         }
     }
 }
