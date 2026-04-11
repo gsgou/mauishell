@@ -16,11 +16,12 @@ Inspired by [Prism Library](https://prismlibrary.com) by Dan Siegel and Brian La
 
 | Capability | Description |
 |:-----------|:------------|
-| Route-based | `NavigateTo("Detail", ("Id", "123"))` |
+| Route-based | `NavigateTo("Detail", args: [("Id", "123")])` |
 | ViewModel-based | `NavigateTo<DetailViewModel>(vm => vm.Id = "123")` |
 | Source-generated | `NavigateToDetail("123")` — zero guesswork |
 | GoBack | Single page, multi-page `GoBack(3)`, or `PopToRoot()` |
-| SetRoot | `SetRoot<DashboardViewModel>()` — reset the navigation stack |
+| Root navigation | `NavigateTo<DashboardViewModel>(relativeNavigation: false)` — reset the stack |
+| Navigation builder | Fluent multi-segment: `CreateBuilder().AddDetail(42).AddModal().Navigate()` |
 | Shell switching | `SwitchShell(new MainShell())` or `SwitchShell<TShell>()` via DI |
 
 ### 💬 Dialogs — `IDialogs`
@@ -59,6 +60,7 @@ Inspired by [Prism Library](https://prismlibrary.com) by Dan Siegel and Brian La
 |:----------------|:------------|
 | `Routes.g.cs` | Static route constants — `Routes.Detail` |
 | `NavigationExtensions.g.cs` | Typed methods — `NavigateToDetail(id, page)` |
+| `NavigationBuilderNavExtensions.g.cs` | Typed builder methods — `AddDetail(id, page)` |
 | `NavigationBuilderExtensions.g.cs` | One-line DI — `AddGeneratedMaps()` |
 
 > Invalid route names produce **SHINY001** compiler errors. Disable individual outputs via MSBuild properties.
@@ -147,13 +149,16 @@ Inject `INavigator` into your ViewModels:
 public class MyViewModel(INavigator navigator)
 {
     // Route-based navigation with args
-    await navigator.NavigateTo("Detail", ("ItemId", "123"));
+    await navigator.NavigateTo("Detail", args: [("ItemId", "123")]);
 
     // ViewModel-based navigation with strongly-typed configuration
     await navigator.NavigateTo<DetailViewModel>(vm => vm.ItemId = "123");
 
     // Source-generated strongly-typed method (preferred)
     await navigator.NavigateToDetail("123");
+
+    // Root navigation — resets the stack
+    await navigator.NavigateTo<DashboardViewModel>(relativeNavigation: false);
 
     // Go back with result
     await navigator.GoBack(("Result", selectedItem));
@@ -164,14 +169,32 @@ public class MyViewModel(INavigator navigator)
     // Pop to root
     await navigator.PopToRoot();
 
-    // Replace root page
-    await navigator.SetRoot<DashboardViewModel>();
-
     // Switch to a different Shell instance
     await navigator.SwitchShell(new MainAppShell());
 
     // Switch to a Shell resolved from DI
     await navigator.SwitchShell<MainAppShell>();
+
+    // Fluent multi-segment navigation builder
+    await navigator
+        .CreateBuilder()
+        .AddDetail(id: 42)
+        .AddModal()
+        .Navigate();
+
+    // Pop back 2 pages, then push
+    await navigator
+        .CreateBuilder()
+        .PopBack(2)
+        .AddHome()
+        .Navigate();
+
+    // Navigate from root with builder
+    await navigator
+        .CreateBuilder(fromRoot: true)
+        .AddDashboard()
+        .AddDetail(id: 1)
+        .Navigate();
 }
 ```
 
@@ -299,16 +322,27 @@ public static class Routes
     public const string Detail = "Detail";
 }
 
-// NavigationExtensions.g.cs — method name matches the route parameter
+// NavigationExtensions.g.cs — typed INavigator methods
 public static class NavigationExtensions
 {
-    public static Task NavigateToDetail(this INavigator navigator, string itemId, int page = default)
+    public static Task NavigateToDetail(this INavigator navigator, string itemId,
+        int page = default, bool relativeNavigation = true)
     {
         return navigator.NavigateTo<DetailViewModel>(x =>
         {
             x.ItemId = itemId;
             x.Page = page;
-        });
+        }, relativeNavigation);
+    }
+}
+
+// NavigationBuilderNavExtensions.g.cs — typed INavigationBuilder methods
+public static class NavigationBuilderNavExtensions
+{
+    public static INavigationBuilder AddDetail(this INavigationBuilder builder,
+        string itemId, int page = default)
+    {
+        return builder.Add<DetailViewModel>(x => { x.ItemId = itemId; x.Page = page; });
     }
 }
 
@@ -330,6 +364,9 @@ builder.UseShinyShell(x => x.AddGeneratedMaps());
 
 // Navigate with generated extension methods - no guesswork
 await navigator.NavigateToDetail("123", page: 2);
+
+// Fluent builder with generated extensions
+await navigator.CreateBuilder().AddDetail("123", page: 2).Navigate();
 ```
 
 ### Route Naming

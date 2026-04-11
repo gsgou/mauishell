@@ -267,7 +267,10 @@ public class ShinyShellGenerator : IIncrementalGenerator
         
         // Generate NavigationExtensions class only if enabled
         if (options.GenerateNavExtensions)
+        {
             GenerateNavigationExtensions(context, filtered);
+            GenerateNavigationBuilderNavExtensions(context, filtered);
+        }
     }
 
     static void GenerateRoutesClass(SourceProductionContext context, ImmutableArray<ShellMapInfo> classes)
@@ -380,6 +383,58 @@ public class ShinyShellGenerator : IIncrementalGenerator
         sb.AppendLine("}");
         
         context.AddSource("NavigationBuilderExtensions.g.cs", sb.ToString());
+    }
+
+    static void GenerateNavigationBuilderNavExtensions(SourceProductionContext context, ImmutableArray<ShellMapInfo> classes)
+    {
+        var sb = new StringBuilder();
+        sb.AppendLine("#nullable enable");
+        sb.AppendLine("public static class NavigationBuilderNavExtensions");
+        sb.AppendLine("{");
+
+        foreach (var cls in classes)
+        {
+            var methodName = $"Add{cls.GeneratedName}";
+            var requiredParams = cls.Properties.Where(p => p.IsRequired).ToList();
+            var optionalParams = cls.Properties.Where(p => !p.IsRequired).ToList();
+
+            if (cls.Properties.Any())
+            {
+                sb.Append($"    public static global::Shiny.INavigationBuilder {methodName}(this global::Shiny.INavigationBuilder builder");
+
+                foreach (var prop in requiredParams)
+                    sb.Append($", {prop.TypeName} {ToCamelCase(prop.Name)}");
+
+                foreach (var prop in optionalParams)
+                {
+                    var defaultValue = GetDefaultValue(prop.TypeName);
+                    sb.Append($", {prop.TypeName} {ToCamelCase(prop.Name)} = {defaultValue}");
+                }
+
+                sb.AppendLine(")");
+                sb.AppendLine("    {");
+                sb.Append($"        return builder.Add<{cls.ViewModelFullName}>(x => {{ ");
+
+                var assignments = cls.Properties.Select(p => $"x.{p.Name} = {ToCamelCase(p.Name)}");
+                sb.Append(string.Join("; ", assignments));
+                sb.Append(";");
+
+                sb.AppendLine(" });");
+                sb.AppendLine("    }");
+            }
+            else
+            {
+                sb.AppendLine($"    public static global::Shiny.INavigationBuilder {methodName}(this global::Shiny.INavigationBuilder builder)");
+                sb.AppendLine("    {");
+                sb.AppendLine($"        return builder.Add<{cls.ViewModelFullName}>();");
+                sb.AppendLine("    }");
+            }
+
+            sb.AppendLine();
+        }
+
+        sb.AppendLine("}");
+        context.AddSource("NavigationBuilderNavExtensions.g.cs", sb.ToString());
     }
 
     static string ToCamelCase(string text)

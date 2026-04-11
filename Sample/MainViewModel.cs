@@ -43,6 +43,14 @@ public partial class MainViewModel(
         x => x.IsNavFromViewModel = true,
         args: [("Arg", this.NavArg)]
     );
+
+    [RelayCommand]
+    Task NavBuilderChain() => navigator
+        .CreateBuilder()
+        .AddChain("Page1")
+        .Add<AnotherViewModel>(x => x.Arg = "From Builder")
+        .AddChain("Page3")
+        .Navigate();
     
     public void ApplyQueryAttributes(IDictionary<string, object> query)
     {

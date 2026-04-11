@@ -94,6 +94,20 @@ public class ShinyShellNavigator(
     }
 
 
+    public INavigationBuilder CreateBuilder(bool fromRoot = false)
+        => new NavigationBuilder(this, navBuilder, mainThread, logger, fromRoot);
+
+
+    internal void PrepareForProgrammaticNavigation(string uri, NavigationType navType, Dictionary<string, object> parameters)
+    {
+        if (Shell.Current.CurrentPage?.BindingContext is INavigationAware navAware)
+            navAware.OnNavigatingFrom(parameters);
+
+        this.RaiseNavigating(Shell.Current, uri, navType, parameters);
+        this.isProgrammaticNavigation = true;
+    }
+
+
     public Task NavigateTo(string route, bool relativeNavigation = true, params IEnumerable<(string Key, object Value)> args) =>
         mainThread.InvokeOnMainThreadAsync(() =>
         {

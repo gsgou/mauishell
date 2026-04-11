@@ -42,8 +42,12 @@
                     Command="{Binding NavToModalCommand}"
                     HorizontalOptions="Fill" />
             
-            <Button Text="Navigate By ViewModel" 
+            <Button Text="Navigate By ViewModel"
                     Command="{Binding NavByViewModelCommand}"
+                    HorizontalOptions="Fill" />
+
+            <Button Text="Builder Chain Test"
+                    Command="{Binding NavBuilderChainCommand}"
                     HorizontalOptions="Fill" />
 
             <Label Text="{Binding BackArg, StringFormat='Back Arg: {0}'}" 

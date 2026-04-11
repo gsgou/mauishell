@@ -6,6 +6,13 @@ public interface INavigator
     event EventHandler<NavigatedEventArgs>? Navigated;
 
     /// <summary>
+    /// Creates a fluent navigation builder for constructing multi-segment navigation URIs
+    /// </summary>
+    /// <param name="fromRoot">If true, builds an absolute URI starting with "//". If false (default), builds a relative URI.</param>
+    INavigationBuilder CreateBuilder(bool fromRoot = false);
+
+
+    /// <summary>
     /// Navigates to the specified route and passes the provided arguments to the target page or view model.
     /// </summary>
     /// <remarks>To receive the arguments passed via <paramref name="args"/>, the target page or view model
@@ -27,7 +34,7 @@ public interface INavigator
     /// <typeparam name="TViewModel">The type of the view model to navigate to. The view model must be registered in the navigation system.</typeparam>
     /// <param name="configure">An optional action to configure the view model before navigation. This can be used to set up properties or
     /// perform initialization.</param>
-    // <param name="relativeNavigation">Assumes relative navigation (page1/page2), if set to false, assumes root navigation "//" </param>
+    /// <param name="relativeNavigation">Assumes relative navigation (page1/page2), if set to false, assumes root navigation "//" </param>
     /// <param name="args">A collection of key-value pairs representing arguments to pass to the view during navigation. Each key must be
     /// unique.</param>
     /// <returns>A task that represents the asynchronous navigation operation.</returns>

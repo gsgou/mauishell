@@ -28,8 +28,18 @@ namespace Shiny
         public ShellPropertyAttribute(bool required = true) { }
     }
 
+    public interface INavigationBuilder
+    {
+        INavigationBuilder PopBack(int count = 1);
+        INavigationBuilder Add<TViewModel>() where TViewModel : class;
+        INavigationBuilder Add<TViewModel>(Action<TViewModel> configure) where TViewModel : class;
+        INavigationBuilder Add(string routeName);
+        Task Navigate();
+    }
+
     public interface INavigator
     {
+        INavigationBuilder CreateBuilder(bool fromRoot = false);
         Task NavigateTo<TViewModel>(Action<TViewModel> configure = null, bool relativeNavigation = true);
         Task NavigateTo<TViewModel>(Action<TViewModel> configure = null, bool relativeNavigation = true, params IEnumerable<(string Key, object Value)> args);
     }
@@ -452,6 +462,105 @@ namespace TestApp
         var result = RunGenerator(source);
 
         result.Diagnostics.ShouldNotContain(d => d.Id == "SHINY001");
+    }
+
+    #endregion
+
+    #region NavigationBuilder Extensions
+
+    [Fact]
+    public void BuilderNavExtensions_DefaultRoute_GeneratesAddMethod()
+    {
+        var source = StubTypes + @"
+
+namespace TestApp
+{
+    public class HomePage : Microsoft.Maui.Controls.Page { }
+
+    [ShellMap<HomePage>]
+    public class HomeViewModel : System.ComponentModel.INotifyPropertyChanged
+    {
+        public event System.ComponentModel.PropertyChangedEventHandler? PropertyChanged;
+    }
+}";
+        var result = RunGenerator(source);
+        var builderNavSource = GetGeneratedSource(result, "NavigationBuilderNavExtensions.g.cs");
+
+        builderNavSource.ShouldContain("AddHome");
+        builderNavSource.ShouldContain("this global::Shiny.INavigationBuilder builder");
+        builderNavSource.ShouldContain("builder.Add<TestApp.HomeViewModel>()");
+    }
+
+    [Fact]
+    public void BuilderNavExtensions_WithProperties_GeneratesParameterizedMethod()
+    {
+        var source = StubTypes + @"
+
+namespace TestApp
+{
+    public class DetailPage : Microsoft.Maui.Controls.Page { }
+
+    [ShellMap<DetailPage>]
+    public class DetailViewModel : System.ComponentModel.INotifyPropertyChanged
+    {
+        public event System.ComponentModel.PropertyChangedEventHandler? PropertyChanged;
+
+        [ShellProperty(true)]
+        public int Id { get; set; }
+
+        [ShellProperty]
+        public string? Name { get; set; }
+    }
+}";
+        var result = RunGenerator(source);
+        var builderNavSource = GetGeneratedSource(result, "NavigationBuilderNavExtensions.g.cs");
+
+        builderNavSource.ShouldContain("AddDetail");
+        builderNavSource.ShouldContain("int id");
+        builderNavSource.ShouldContain("string? name");
+        builderNavSource.ShouldContain("builder.Add<TestApp.DetailViewModel>(x => {");
+    }
+
+    [Fact]
+    public void BuilderNavExtensions_DisabledViaProperty_NotGenerated()
+    {
+        var source = StubTypes + @"
+
+namespace TestApp
+{
+    public class HomePage : Microsoft.Maui.Controls.Page { }
+
+    [ShellMap<HomePage>]
+    public class HomeViewModel : System.ComponentModel.INotifyPropertyChanged
+    {
+        public event System.ComponentModel.PropertyChangedEventHandler? PropertyChanged;
+    }
+}";
+        var result = RunGenerator(source, ("ShinyMauiShell_GenerateNavExtensions", "false"));
+
+        GetGeneratedSourceOrDefault(result, "NavigationBuilderNavExtensions.g.cs").ShouldBeNull();
+    }
+
+    [Fact]
+    public void BuilderNavExtensions_ExplicitRoute_UsesRouteName()
+    {
+        var source = StubTypes + @"
+
+namespace TestApp
+{
+    public class HomePage : Microsoft.Maui.Controls.Page { }
+
+    [ShellMap<HomePage>(""Dashboard"")]
+    public class HomeViewModel : System.ComponentModel.INotifyPropertyChanged
+    {
+        public event System.ComponentModel.PropertyChangedEventHandler? PropertyChanged;
+    }
+}";
+        var result = RunGenerator(source);
+        var builderNavSource = GetGeneratedSource(result, "NavigationBuilderNavExtensions.g.cs");
+
+        builderNavSource.ShouldContain("AddDashboard");
+        builderNavSource.ShouldNotContain("AddHome");
     }
 
     #endregion
