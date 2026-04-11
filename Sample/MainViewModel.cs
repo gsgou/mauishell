@@ -36,12 +36,12 @@ public partial class MainViewModel(
         }
     }
     
-    [RelayCommand] Task NavByUri() => navigator.NavigateTo("another", ("Arg", this.NavArg));
+    [RelayCommand] Task NavByUri() => navigator.NavigateTo("another", args: [("Arg", this.NavArg)]);
     [RelayCommand] Task NavToModal(string uri) => navigator.NavigateTo("modal");
     [RelayCommand]
     Task NavByViewModel() => navigator.NavigateTo<AnotherViewModel>(
-        x => x.IsNavFromViewModel = true, 
-        ("Arg", this.NavArg)
+        x => x.IsNavFromViewModel = true,
+        args: [("Arg", this.NavArg)]
     );
     
     public void ApplyQueryAttributes(IDictionary<string, object> query)

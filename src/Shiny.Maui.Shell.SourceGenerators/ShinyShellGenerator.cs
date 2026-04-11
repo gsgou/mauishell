@@ -303,43 +303,45 @@ public class ShinyShellGenerator : IIncrementalGenerator
             var optionalParams = cls.Properties.Where(p => !p.IsRequired).ToList();
             
             sb.Append($"    public static global::System.Threading.Tasks.Task {methodName}(this global::Shiny.INavigator navigator");
-            
+
             // Add required parameters first
             foreach (var prop in requiredParams)
             {
                 sb.Append($", {prop.TypeName} {ToCamelCase(prop.Name)}");
             }
-            
+
             // Add optional parameters last
             foreach (var prop in optionalParams)
             {
                 var defaultValue = GetDefaultValue(prop.TypeName);
                 sb.Append($", {prop.TypeName} {ToCamelCase(prop.Name)} = {defaultValue}");
             }
-            
+
+            sb.Append(", bool relativeNavigation = true");
+
             // If no properties, add the params argument
             if (!cls.Properties.Any())
             {
                 sb.Append(", params global::System.Collections.Generic.IEnumerable<(string Key, object Value)> args");
             }
-            
+
             sb.AppendLine(")");
             sb.AppendLine("    {");
-            
+
             if (cls.Properties.Any())
             {
                 sb.Append($"        return navigator.NavigateTo<{cls.ViewModelFullName}>(x => ");
                 sb.Append("{ ");
-                
+
                 var assignments = cls.Properties.Select(p => $"x.{p.Name} = {ToCamelCase(p.Name)}");
                 sb.Append(string.Join("; ", assignments));
                 sb.Append(";");
-                
-                sb.AppendLine(" });");
+
+                sb.AppendLine($" }}, relativeNavigation);");
             }
             else
             {
-                sb.AppendLine($"        return navigator.NavigateTo<{cls.ViewModelFullName}>(configure: null, args: args);");
+                sb.AppendLine($"        return navigator.NavigateTo<{cls.ViewModelFullName}>(configure: null, relativeNavigation: relativeNavigation, args: args);");
             }
             
             sb.AppendLine("    }");

@@ -72,6 +72,15 @@ public sealed class ShinyAppBuilder(MauiAppBuilder builder)
 
         return null;
     }
+
+
+    /// <summary>
+    /// Gets the Page type registered for a given route
+    /// </summary>
+    /// <param name="route"></param>
+    /// <returns></returns>
+    public Type? GetPageTypeForRoute(string route)
+        => this.typeMap.TryGetValue(route, out var entry) ? entry.PageType : null;
     
     
     internal void RegisterDependencies()

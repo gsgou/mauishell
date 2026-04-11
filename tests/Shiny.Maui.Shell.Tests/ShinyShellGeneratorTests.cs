@@ -30,7 +30,8 @@ namespace Shiny
 
     public interface INavigator
     {
-        Task NavigateTo<TViewModel>(Action<TViewModel> configure = null);
+        Task NavigateTo<TViewModel>(Action<TViewModel> configure = null, bool relativeNavigation = true);
+        Task NavigateTo<TViewModel>(Action<TViewModel> configure = null, bool relativeNavigation = true, params IEnumerable<(string Key, object Value)> args);
     }
 
     public sealed class ShinyAppBuilder

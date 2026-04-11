@@ -94,7 +94,7 @@ public class ShinyShellNavigator(
     }
 
 
-    public Task NavigateTo(string uri, params IEnumerable<(string Key, object Value)> args) =>
+    public Task NavigateTo(string route, bool relativeNavigation = true, params IEnumerable<(string Key, object Value)> args) =>
         mainThread.InvokeOnMainThreadAsync(() =>
         {
             var shell = Shell.Current;
@@ -103,27 +103,27 @@ public class ShinyShellNavigator(
             if (shell.CurrentPage?.BindingContext is INavigationAware navAware)
                 navAware.OnNavigatingFrom(parameters);
 
-            this.RaiseNavigating(shell, uri, NavigationType.Push, parameters);
+            var uri = relativeNavigation ? route : $"//{route}";
+            var navType = relativeNavigation ? NavigationType.Push : NavigationType.SetRoot;
+            this.RaiseNavigating(shell, uri, navType, parameters);
             this.isProgrammaticNavigation = true;
+
+            if (OperatingSystem.IsLinux())
+            {
+                // Shell.GoToAsync is unreliable on Platform.Maui.Linux.Gtk4 — resolve
+                // the page from the registered route map and push directly.
+                var pageType = navBuilder.GetPageTypeForRoute(route);
+                if (pageType != null && services.GetService(pageType) is Page page)
+                    return shell.Navigation.PushAsync(page, true);
+            }
+
             return shell.GoToAsync(uri, true, parameters);
         });
 
 
-    public Task NavigateTo<TViewModel>(
+    public async Task NavigateTo<TViewModel>(
         Action<TViewModel>? configure = null,
-        params IEnumerable<(string Key, object Value)> args
-    ) => this.NavigateTo(configure, false, args);
-
-
-    public Task SetRoot<TViewModel>(
-        Action<TViewModel>? configure = null,
-        params IEnumerable<(string Key, object Value)> args
-    ) => this.NavigateTo(configure, true, args);
-
-    
-    async Task NavigateTo<TViewModel>(
-        Action<TViewModel>? configure = null,
-        bool resetToRoot = false,
+        bool relativeNavigation = true,
         params IEnumerable<(string Key, object Value)> args
     )
     {
@@ -131,9 +131,9 @@ public class ShinyShellNavigator(
         if (route == null)
             throw new InvalidOperationException($"Could not find a route for viewmodel '{typeof(TViewModel)}'");
 
-        if (resetToRoot)
+        if (!relativeNavigation)
             route = $"//{route}";
-        
+
         var tcs = new TaskCompletionSource();
         var handler = new EventHandler<Page>((_, page) =>
         {
@@ -153,7 +153,7 @@ public class ShinyShellNavigator(
             if (Shell.Current.CurrentPage?.BindingContext is INavigationAware navAware)
                 navAware.OnNavigatingFrom(parameters);
 
-            var navType = resetToRoot ? NavigationType.SetRoot : NavigationType.Push;
+            var navType = relativeNavigation ? NavigationType.Push : NavigationType.SetRoot;
             this.RaiseNavigating(Shell.Current, route, navType, parameters);
 
             ShinyRouteFactory.PageResolved += handler;

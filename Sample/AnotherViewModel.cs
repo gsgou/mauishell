@@ -15,8 +15,8 @@ public partial class AnotherViewModel(
     [ObservableProperty] bool isNavFromViewModel;
     
     [RelayCommand] Task GoBack() => navigator.GoBack(("ToTheBack", this.BackArg));
-    [RelayCommand] Task ResetToRoot() => navigator.SetRoot<MainViewModel>(x => x.BackArg = "RESET TO ROOT");
-    [RelayCommand] Task PushAnother() => navigator.NavigateTo("another", ("Arg", "Pushing Another"));
+    [RelayCommand] Task ResetToRoot() => navigator.NavigateTo<MainViewModel>(x => x.BackArg = "RESET TO ROOT", relativeNavigation: false);
+    [RelayCommand] Task PushAnother() => navigator.NavigateTo("another", args: [("Arg", "Pushing Another")]);
     [RelayCommand] Task PopToRoot() => navigator.PopToRoot(("ToTheBack", "POPPED TO ROOT"));
 
     [ObservableProperty] string dialogResult;

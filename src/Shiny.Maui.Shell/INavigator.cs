@@ -11,10 +11,11 @@ public interface INavigator
     /// <remarks>To receive the arguments passed via <paramref name="args"/>, the target page or view model
     /// must implement the <see cref="IQueryAttributable"/> interface.</remarks>
     /// <param name="route">The route to navigate to. This should be a valid route string recognized by the navigation system.</param>
+    /// <param name="relativeNavigation">Assumes relative navigation (page1/page2), if set to false, assumes root navigation "//" </param>
     /// <param name="args">A collection of key-value pairs representing the arguments to pass to the target page or view model. Each key
     /// must be unique.</param>
     /// <returns>A task that represents the asynchronous navigation operation.</returns>
-    Task NavigateTo(string route, params IEnumerable<(string Key, object Value)> args);
+    Task NavigateTo(string route, bool relativeNavigation = true, params IEnumerable<(string Key, object Value)> args);
 
 
     /// <summary>
@@ -26,33 +27,17 @@ public interface INavigator
     /// <typeparam name="TViewModel">The type of the view model to navigate to. The view model must be registered in the navigation system.</typeparam>
     /// <param name="configure">An optional action to configure the view model before navigation. This can be used to set up properties or
     /// perform initialization.</param>
+    // <param name="relativeNavigation">Assumes relative navigation (page1/page2), if set to false, assumes root navigation "//" </param>
     /// <param name="args">A collection of key-value pairs representing arguments to pass to the view during navigation. Each key must be
     /// unique.</param>
     /// <returns>A task that represents the asynchronous navigation operation.</returns>
     Task NavigateTo<TViewModel>(
         Action<TViewModel>? configure = null, 
-        params IEnumerable<(string Key, object Value)> args
-    );
-    
-    
-    /// <summary>
-    /// Navigates to a view associated with the specified view model type.
-    /// </summary>
-    /// <remarks>This method allows for flexible navigation by enabling both view model configuration and the
-    /// passing of additional arguments. Ensure that the specified view model type is properly registered and that any
-    /// required arguments are provided.</remarks>
-    /// <typeparam name="TViewModel">The type of the view model to navigate to. The view model must be registered in the navigation system.</typeparam>
-    /// <param name="configure">An optional action to configure the view model before navigation. This can be used to set up properties or
-    /// perform initialization.</param>
-    /// <param name="args">A collection of key-value pairs representing arguments to pass to the view during navigation. Each key must be
-    /// unique.</param>
-    /// <returns>A task that represents the asynchronous navigation operation.</returns>
-    Task SetRoot<TViewModel>(
-        Action<TViewModel>? configure = null, 
+        bool relativeNavigation = true,
         params IEnumerable<(string Key, object Value)> args
     );
 
-
+    
     /// <summary>
     /// Returns to the root page regardless of how far up the stack you are
     /// </summary>
