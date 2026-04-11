@@ -1,8 +1,8 @@
 namespace Sample;
 
-public partial class ChainPage : ContentPage
+public partial class OnePage : ContentPage
 {
-    public ChainPage()
+    public OnePage()
     {
         this.InitializeComponent();
     }

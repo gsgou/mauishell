@@ -7,7 +7,7 @@ namespace Sample;
 public partial class MainViewModel(
     ILogger<MainViewModel> logger,
     INavigator navigator
-) : ObservableObject, IQueryAttributable, IPageLifecycleAware
+) : ObservableObject, IQueryAttributable, IPageLifecycleAware, INavigationAware
 {
     [ObservableProperty] string navArg;
 
@@ -44,12 +44,14 @@ public partial class MainViewModel(
         args: [("Arg", this.NavArg)]
     );
 
+    [RelayCommand] Task NavToOne() => navigator.NavigateTo<OneViewModel>(x => x.Text = "From Main");
+
     [RelayCommand]
     Task NavBuilderChain() => navigator
         .CreateBuilder()
-        .AddChain("Page1")
-        .Add<AnotherViewModel>(x => x.Arg = "From Builder")
-        .AddChain("Page3")
+        .Add<OneViewModel>(x => x.Text = "From Builder")
+        .Add<AnotherViewModel>(x => x.Arg = "Mid-Chain")
+        .Add<TwoViewModel>(x => x.Text = "End of Chain")
         .Navigate();
     
     public void ApplyQueryAttributes(IDictionary<string, object> query)

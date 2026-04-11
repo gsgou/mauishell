@@ -46,7 +46,11 @@
                     Command="{Binding NavByViewModelCommand}"
                     HorizontalOptions="Fill" />
 
-            <Button Text="Builder Chain Test"
+            <Button Text="Navigate to One"
+                    Command="{Binding NavToOneCommand}"
+                    HorizontalOptions="Fill" />
+
+            <Button Text="Builder Chain (One > Another > Two)"
                     Command="{Binding NavBuilderChainCommand}"
                     HorizontalOptions="Fill" />
 

@@ -198,6 +198,9 @@ public class MyViewModel(INavigator navigator)
 }
 ```
 
+> [!IMPORTANT]
+> Root navigation (`relativeNavigation: false` or `CreateBuilder(fromRoot: true)`) uses the `//` URI prefix, which requires the target route to be declared in your `AppShell.xaml`. Routes registered only via `Routing.RegisterRoute` or `[ShellMap]` cannot be navigated to from root. Add the page as a `ShellContent` in your Shell XAML and use `registerRoute: false` in `[ShellMap]`.
+
 > [!NOTE]
 > If you're setting arguments on the ViewModel navigation, you should make them observable if they are bound on the Page.
 
