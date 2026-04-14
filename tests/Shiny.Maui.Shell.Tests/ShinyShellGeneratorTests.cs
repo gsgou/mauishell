@@ -209,7 +209,10 @@ namespace TestApp
         var result = RunGenerator(source, ("ShinyMauiShell_GenerateNavExtensions", "false"));
 
         GetGeneratedSourceOrDefault(result, "NavigationExtensions.g.cs").ShouldBeNull();
+        GetGeneratedSourceOrDefault(result, "NavigationBuilderExtensions.g.cs").ShouldBeNull();
+        GetGeneratedSourceOrDefault(result, "NavigationBuilderNavExtensions.g.cs").ShouldBeNull();
         GetGeneratedSource(result, "Routes.g.cs").ShouldNotBeNull();
+        result.Diagnostics.ShouldContain(d => d.Id == "SHINY002");
     }
 
     [Fact]
@@ -233,7 +236,7 @@ namespace TestApp
     }
 
     [Fact]
-    public void BothDisabled_OnlyGeneratesBuilderExtensions()
+    public void BothDisabled_GeneratesNothing()
     {
         var source = StubTypes + @"
 
@@ -253,7 +256,9 @@ namespace TestApp
 
         GetGeneratedSourceOrDefault(result, "Routes.g.cs").ShouldBeNull();
         GetGeneratedSourceOrDefault(result, "NavigationExtensions.g.cs").ShouldBeNull();
-        GetGeneratedSource(result, "NavigationBuilderExtensions.g.cs").ShouldNotBeNull();
+        GetGeneratedSourceOrDefault(result, "NavigationBuilderExtensions.g.cs").ShouldBeNull();
+        GetGeneratedSourceOrDefault(result, "NavigationBuilderNavExtensions.g.cs").ShouldBeNull();
+        result.Diagnostics.ShouldContain(d => d.Id == "SHINY002");
     }
 
     #endregion
@@ -352,10 +357,10 @@ namespace TestApp
 
     #endregion
 
-    #region Empty Maps Still Generates Builder
+    #region No Maps Does Not Generate Builder
 
     [Fact]
-    public void NoShellMaps_StillGeneratesBuilderExtensions()
+    public void NoShellMaps_DoesNotGenerateBuilderExtensions()
     {
         var source = StubTypes + @"
 
@@ -364,10 +369,8 @@ namespace TestApp
     public class HomePage : Microsoft.Maui.Controls.Page { }
 }";
         var result = RunGenerator(source);
-        var builderSource = GetGeneratedSource(result, "NavigationBuilderExtensions.g.cs");
 
-        builderSource.ShouldContain("AddGeneratedMaps");
-        builderSource.ShouldContain("return builder;");
+        GetGeneratedSourceOrDefault(result, "NavigationBuilderExtensions.g.cs").ShouldBeNull();
     }
 
     #endregion
