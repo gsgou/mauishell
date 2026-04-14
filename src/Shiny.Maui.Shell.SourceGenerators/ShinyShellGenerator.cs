@@ -20,6 +20,15 @@ public class ShinyShellGenerator : IIncrementalGenerator
         DiagnosticSeverity.Error,
         isEnabledByDefault: true
     );
+
+    static readonly DiagnosticDescriptor NavExtensionsDisabledWithMaps = new(
+        "SHINY002",
+        "Navigation extensions disabled but ShellMap attributes detected",
+        "ShinyMauiShell_GenerateNavExtensions is set to false but {0} ShellMap attribute(s) were detected. AddGeneratedMaps will not be generated.",
+        "Shiny.Shell",
+        DiagnosticSeverity.Warning,
+        isEnabledByDefault: true
+    );
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {
         // Find classes with ShellMapAttribute
@@ -255,22 +264,28 @@ public class ShinyShellGenerator : IIncrementalGenerator
         }
         var filtered = checkedClasses.ToImmutable();
 
-        // Always generate AddGeneratedMaps so user can use it immediately
-        GenerateNavigationBuilderExtensions(context, filtered);
-
         if (filtered.IsEmpty)
             return;
+
+        // Generate AddGeneratedMaps and nav extensions only if enabled
+        if (options.GenerateNavExtensions)
+        {
+            GenerateNavigationBuilderExtensions(context, filtered);
+            GenerateNavigationExtensions(context, filtered);
+            GenerateNavigationBuilderNavExtensions(context, filtered);
+        }
+        else
+        {
+            context.ReportDiagnostic(Diagnostic.Create(
+                NavExtensionsDisabledWithMaps,
+                Location.None,
+                filtered.Length
+            ));
+        }
 
         // Generate Routes class only if enabled
         if (options.GenerateRouteConstants)
             GenerateRoutesClass(context, filtered);
-        
-        // Generate NavigationExtensions class only if enabled
-        if (options.GenerateNavExtensions)
-        {
-            GenerateNavigationExtensions(context, filtered);
-            GenerateNavigationBuilderNavExtensions(context, filtered);
-        }
     }
 
     static void GenerateRoutesClass(SourceProductionContext context, ImmutableArray<ShellMapInfo> classes)

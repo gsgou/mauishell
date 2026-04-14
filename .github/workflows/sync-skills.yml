@@ -32,13 +32,12 @@ jobs:
 
       - name: Sync skills directory
         run: |
-          # Copy skills content only (not plugin manifests)
-          # The target repo has its own plugin structure
+          # Copy skills content to the shiny-maui plugin in the skills repo
           if [ -d "source/skills/shiny-maui-shell" ]; then
             # Remove existing skill directory to ensure clean sync
-            rm -rf skills-repo/skills/shiny-maui-shell
-            mkdir -p skills-repo/skills
-            cp -r source/skills/shiny-maui-shell skills-repo/skills/
+            rm -rf skills-repo/plugins/shiny-maui/skills/shiny-maui-shell
+            mkdir -p skills-repo/plugins/shiny-maui/skills
+            cp -r source/skills/shiny-maui-shell skills-repo/plugins/shiny-maui/skills/
           fi
 
       - name: Create Pull Request
