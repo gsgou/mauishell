@@ -10,7 +10,11 @@ public static class MauiProgram
         var builder = MauiApp
             .CreateBuilder()
             .UseMauiApp<App>()
-            .UseShinyShell(x => x.AddGeneratedMaps())
+            .UseUxDiversDialogs()
+            .UseShinyShell(x => x
+                .UseUxDiversDialogs()
+                .AddGeneratedMaps()
+            )
             .ConfigureFonts(fonts =>
             {
                 fonts.AddFont("OpenSans-Regular.ttf", "OpenSansRegular");

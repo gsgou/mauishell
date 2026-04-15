@@ -1,0 +1,18 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        <RootNamespace>Shiny</RootNamespace>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="UXDivers.Popups.Maui" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\src\Shiny.Maui.Shell\Shiny.Maui.Shell.csproj" />
+    </ItemGroup>
+
+</Project>

@@ -34,6 +34,8 @@ Inspired by [Prism Library](https://prismlibrary.com) by Dan Siegel and Brian La
 | `ActionSheet(title, cancel, destructive, ...buttons)` | `Task<string>` |
 
 > Thread-safe — dispatches to UI thread automatically. Inject separately from `INavigator` for clean separation of concerns.
+>
+> **Alternative provider:** Use `Shiny.Maui.Shell.UxDiversDialogs` for styled popup dialogs powered by [UXDivers Popups](https://github.com/uxdivers/uxd-popups) — same `IDialogs` interface, no ViewModel changes needed.
 
 ### 📡 Navigation Events
 
@@ -231,6 +233,36 @@ public class MyViewModel(IDialogs dialogs)
     var choice = await dialogs.ActionSheet("Options", "Cancel", "Delete", "Edit", "Share");
 }
 ```
+
+### 6. UxDivers Dialogs (Optional)
+
+Replace the default platform dialogs with styled popups from [UXDivers Popups](https://github.com/uxdivers/uxd-popups):
+
+```bash
+dotnet add package UXDivers.Popups.Maui
+```
+
+Add theme dictionaries to `App.xaml`:
+```xml
+<ResourceDictionary.MergedDictionaries>
+    <!-- your existing styles -->
+    <uxd:DarkTheme xmlns:uxd="clr-namespace:UXDivers.Popups.Maui.Controls;assembly=UXDivers.Popups.Maui" />
+    <uxd:PopupStyles xmlns:uxd="clr-namespace:UXDivers.Popups.Maui.Controls;assembly=UXDivers.Popups.Maui" />
+</ResourceDictionary.MergedDictionaries>
+```
+
+Configure in `MauiProgram.cs`:
+```csharp
+builder
+    .UseMauiApp<App>()
+    .UseUxDiversDialogs()       // Initialize UxDivers popup infrastructure
+    .UseShinyShell(x => x
+        .UseUxDiversDialogs()   // Register as IDialogs provider
+        .AddGeneratedMaps()
+    )
+```
+
+Your ViewModels continue using `IDialogs` as before — only the visual presentation changes.
 
 ---
 
