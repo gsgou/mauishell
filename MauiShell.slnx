@@ -1,8 +1,8 @@
 ﻿<Solution>
     <Folder Name="/Solution/">
         <File Path="readme.md" />
-        <File Path="src/Directory.build.props" />
-        <File Path="src/Directory.build.targets" />
+        <File Path="Directory.build.props" />
+        <File Path="Directory.build.targets" />
         <File Path="LICENSE" />
         <File Path="version.json" />
         <File Path=".github\workflows\build.yml" />

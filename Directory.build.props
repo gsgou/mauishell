@@ -1,12 +1,14 @@
 ﻿<Project>
     <PropertyGroup>
+        <BaseTargetFramework>net10.0</BaseTargetFramework>
         <Authors>Allan Ritchie</Authors>
         <Owners>aritchie;shinylib</Owners>
         <LangVersion>latest</LangVersion>
         <Nullable>enable</Nullable>
+        <ImplicitUsings>enable</ImplicitUsings>
         <DisableExtraReferences>False</DisableExtraReferences>
         <EnableDefaultCompileItems>true</EnableDefaultCompileItems>
-        <Description>Shiny MAUI - Make .NET MAUI shell a pleasant experience</Description>
+        <Description>Shiny MAUI Shell - Make .NET MAUI shell a pleasant experience</Description>
         <PackageLicenseExpression>MIT</PackageLicenseExpression>
         <PackageProjectUrl>https://shinylib.net/maui/shell</PackageProjectUrl>
         <PackageIcon>icon.png</PackageIcon>

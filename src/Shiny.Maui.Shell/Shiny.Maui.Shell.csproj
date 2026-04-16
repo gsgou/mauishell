@@ -1,14 +1,11 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
-        <TargetFramework>net10.0</TargetFramework>
-        <ImplicitUsings>enable</ImplicitUsings>
-        <Nullable>enable</Nullable>
+        <TargetFramework>$(BaseTargetFramework)</TargetFramework>
         <RootNamespace>Shiny</RootNamespace>
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="Nerdbank.GitVersioning" PrivateAssets="All" />
         <PackageReference Include="Microsoft.Maui.Controls" />
     </ItemGroup>
 
