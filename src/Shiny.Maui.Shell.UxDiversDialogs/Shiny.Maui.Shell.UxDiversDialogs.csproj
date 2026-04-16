@@ -12,7 +12,7 @@
     </ItemGroup>
 
     <ItemGroup>
-        <ProjectReference Include="..\src\Shiny.Maui.Shell\Shiny.Maui.Shell.csproj" />
+        <ProjectReference Include="..\Shiny.Maui.Shell\Shiny.Maui.Shell.csproj" />
     </ItemGroup>
 
 </Project>

@@ -49,7 +49,7 @@
                           ReferenceOutputAssembly="false"/>
         
         <ProjectReference Include="..\src\Shiny.Maui.Shell\Shiny.Maui.Shell.csproj"/>
-        <ProjectReference Include="..\Shiny.Maui.Shell.UxDiversDialogs\Shiny.Maui.Shell.UxDiversDialogs.csproj"/>
+        <ProjectReference Include="..\src\Shiny.Maui.Shell.UxDiversDialogs\Shiny.Maui.Shell.UxDiversDialogs.csproj"/>
     </ItemGroup>
 
     <Import Project="..\src\Shiny.Maui.Shell.SourceGenerators\build\Package.targets" />
