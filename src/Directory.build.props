@@ -8,12 +8,12 @@
         <EnableDefaultCompileItems>true</EnableDefaultCompileItems>
         <Description>Shiny MAUI - Make .NET MAUI shell a pleasant experience</Description>
         <PackageLicenseExpression>MIT</PackageLicenseExpression>
-        <PackageProjectUrl>https://github.com/shinyorg/maui</PackageProjectUrl>
+        <PackageProjectUrl>https://shinylib.net/maui/shell/release-notes/</PackageProjectUrl>
         <PackageIcon>icon.png</PackageIcon>
         <PackageReadmeFile>readme.md</PackageReadmeFile>
-        <PackageReleaseNotes>https://github.com/shinyorg/maui</PackageReleaseNotes>
+        <PackageReleaseNotes>https://shinylib.net/maui/shell/release-notes/</PackageReleaseNotes>
         <PackageTags>maui shell shiny navigation</PackageTags>
-        <RepositoryUrl>https://github.com/shinyorg/maui</RepositoryUrl>
+        <RepositoryUrl>https://github.com/shinyorg/mauishell</RepositoryUrl>
         <RepositoryType>git</RepositoryType>
         <CI Condition="'$(GITHUB_ACTIONS)' == 'true'">true</CI>
         <ContinuousIntegrationBuild Condition="'$(GITHUB_ACTIONS)' == 'true'">true</ContinuousIntegrationBuild>
