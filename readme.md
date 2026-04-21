@@ -24,6 +24,7 @@ Inspired by [Prism Library](https://prismlibrary.com) by Dan Siegel and Brian La
 | Navigation builder | Fluent multi-segment: `CreateBuilder().AddDetail(42).AddModal().Navigate()` |
 | Shell switching | `SwitchShell(new MainShell())` or `SwitchShell<TShell>()` via DI |
 | Tab badges | Numeric tab badges via route or ViewModel — `SetTabBadge<InboxViewModel>(3)` |
+| XAML navigation | Attached properties on `Button`, `MenuItem`, and `ToolbarItem` |
 
 ### 💬 Dialogs — `IDialogs`
 
@@ -215,6 +216,43 @@ public class MyViewModel(INavigator navigator)
 
 > [!IMPORTANT]
 > Tab badges only work for routes that are already present as tabs in the active Shell. The badge APIs are supported on Android, iOS, Mac Catalyst, and Windows. Linux and macOS AppKit throw `PlatformNotSupportedException`.
+
+### 4.1 XAML Navigation
+
+Use `Navigate` attached properties when you want route-based navigation directly from XAML without a ViewModel command:
+
+```xml
+<ContentPage
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:shiny="clr-namespace:Shiny;assembly=Shiny.Maui.Shell">
+
+    <Button Text="Open Detail"
+            shiny:Navigate.Route="Detail"
+            shiny:Navigate.ParameterKey="ItemId"
+            shiny:Navigate.ParameterValue="{Binding SelectedId}" />
+
+    <ToolbarItem Text="Home"
+                 shiny:Navigate.Route="MainPage"
+                 shiny:Navigate.RelativeNavigation="False" />
+</ContentPage>
+```
+
+For multiple parameters:
+
+```xml
+<Button Text="Open Modal"
+        shiny:Navigate.Route="modal">
+    <shiny:Navigate.Parameters>
+        <shiny:NavigationParameters>
+            <shiny:NavigationParameter Key="Arg1" Value="{Binding NavArg}" />
+            <shiny:NavigationParameter Key="Arg2" Value="5" />
+        </shiny:NavigationParameters>
+    </shiny:Navigate.Parameters>
+</Button>
+```
+
+`Navigate` currently supports `Button`, `MenuItem`, and `ToolbarItem`.
 
 ### 5. Dialogs
 

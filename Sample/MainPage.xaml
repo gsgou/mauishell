@@ -3,6 +3,7 @@
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:sample="clr-namespace:Sample"
+             xmlns:shiny="clr-namespace:Shiny;assembly=Shiny.Maui.Shell"
              x:DataType="sample:MainViewModel"
              x:Class="Sample.MainPage"
              Title="Home">
@@ -41,7 +42,13 @@
             <Button Text="Navigate To Modal" 
                     Command="{Binding NavToModalCommand}"
                     HorizontalOptions="Fill" />
-            
+
+            <Button Text="XAML Navigate To One"
+                    shiny:Navigate.Route="OnePage"
+                    shiny:Navigate.ParameterKey="Text"
+                    shiny:Navigate.ParameterValue="{Binding NavArg}"
+                    HorizontalOptions="Fill" />
+             
             <Button Text="Navigate By ViewModel"
                     Command="{Binding NavByViewModelCommand}"
                     HorizontalOptions="Fill" />

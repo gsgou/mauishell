@@ -3,9 +3,16 @@
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:sample="clr-namespace:Sample"
+             xmlns:shiny="clr-namespace:Shiny;assembly=Shiny.Maui.Shell"
              x:DataType="sample:AnotherViewModel"
              x:Class="Sample.AnotherPage"
              Title="Another Page">
+    <ContentPage.ToolbarItems>
+        <ToolbarItem Text="Home"
+                     shiny:Navigate.Route="MainPage"
+                     shiny:Navigate.RelativeNavigation="False" />
+    </ContentPage.ToolbarItems>
+
     <VerticalStackLayout
         Padding="30,0"
         Spacing="25">
