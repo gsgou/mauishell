@@ -10,7 +10,8 @@ public class ShinyShellNavigator(
     IApplication application,
     IMainThread mainThread,
     IServiceProvider services,
-    ShinyAppBuilder navBuilder
+    ShinyAppBuilder navBuilder,
+    ShellTabBadgeManager tabBadgeManager
 ) : INavigator, IMauiInitializeService, IDisposable
 {
     public event EventHandler<NavigationEventArgs>? Navigating;
@@ -261,6 +262,32 @@ public class ShinyShellNavigator(
     }
 
 
+    public Task SetTabBadge(string route, int value) => tabBadgeManager.Set(route, value);
+
+
+    public Task SetTabBadge<TViewModel>(int value)
+    {
+        var route = navBuilder.GetRouteForViewModel(typeof(TViewModel));
+        if (route == null)
+            throw new InvalidOperationException($"Could not find a route for viewmodel '{typeof(TViewModel)}'");
+
+        return tabBadgeManager.Set(route, value);
+    }
+
+
+    public Task ClearTabBadge(string route) => tabBadgeManager.Clear(route);
+
+
+    public Task ClearTabBadge<TViewModel>()
+    {
+        var route = navBuilder.GetRouteForViewModel(typeof(TViewModel));
+        if (route == null)
+            throw new InvalidOperationException($"Could not find a route for viewmodel '{typeof(TViewModel)}'");
+
+        return tabBadgeManager.Clear(route);
+    }
+
+
     Task DoGoBack(int backCount, NavigationType navType, IEnumerable<(string Key, object Value)> args) => mainThread.InvokeOnMainThreadAsync(() =>
     {
         if (backCount < 1)
@@ -342,6 +369,7 @@ public class ShinyShellNavigator(
             lc.OnAppearing();
         }
 
+        tabBadgeManager.ReapplyAll();
         this.RaiseNavigated(page.BindingContext);
     }
 

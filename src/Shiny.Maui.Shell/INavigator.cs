@@ -97,4 +97,38 @@ public interface INavigator
     /// <typeparam name="TShell">The type of Shell to resolve and switch to. Must be registered in the DI container.</typeparam>
     /// <returns>A task that represents the asynchronous shell switch operation.</returns>
     Task SwitchShell<TShell>() where TShell : Shell;
+
+
+    /// <summary>
+    /// Sets the badge value on a tab in the active Shell.
+    /// </summary>
+    /// <param name="route">The Shell route for the tab to update.</param>
+    /// <param name="value">The numeric badge value to display.</param>
+    /// <returns>A task that represents the asynchronous badge update.</returns>
+    Task SetTabBadge(string route, int value);
+
+
+    /// <summary>
+    /// Sets the badge value on a tab associated with the specified view model in the active Shell.
+    /// </summary>
+    /// <typeparam name="TViewModel">The view model mapped to the tab page.</typeparam>
+    /// <param name="value">The numeric badge value to display.</param>
+    /// <returns>A task that represents the asynchronous badge update.</returns>
+    Task SetTabBadge<TViewModel>(int value);
+
+
+    /// <summary>
+    /// Clears the badge from a tab in the active Shell.
+    /// </summary>
+    /// <param name="route">The Shell route for the tab to update.</param>
+    /// <returns>A task that represents the asynchronous badge update.</returns>
+    Task ClearTabBadge(string route);
+
+
+    /// <summary>
+    /// Clears the badge from a tab associated with the specified view model in the active Shell.
+    /// </summary>
+    /// <typeparam name="TViewModel">The view model mapped to the tab page.</typeparam>
+    /// <returns>A task that represents the asynchronous badge update.</returns>
+    Task ClearTabBadge<TViewModel>();
 }

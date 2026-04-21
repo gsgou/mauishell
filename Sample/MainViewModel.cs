@@ -46,6 +46,10 @@ public partial class MainViewModel(
 
     [RelayCommand] Task NavToOne() => navigator.NavigateTo<OneViewModel>(x => x.Text = "From Main");
 
+    [RelayCommand] Task SetBadgeTab(int value) => navigator.SetTabBadge<BadgeTabViewModel>(value);
+
+    [RelayCommand] Task ClearBadgeTab() => navigator.ClearTabBadge<BadgeTabViewModel>();
+
     [RelayCommand]
     Task NavBuilderChain() => navigator
         .CreateBuilder()

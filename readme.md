@@ -23,6 +23,7 @@ Inspired by [Prism Library](https://prismlibrary.com) by Dan Siegel and Brian La
 | Root navigation | `NavigateTo<DashboardViewModel>(relativeNavigation: false)` — reset the stack |
 | Navigation builder | Fluent multi-segment: `CreateBuilder().AddDetail(42).AddModal().Navigate()` |
 | Shell switching | `SwitchShell(new MainShell())` or `SwitchShell<TShell>()` via DI |
+| Tab badges | Numeric tab badges via route or ViewModel — `SetTabBadge<InboxViewModel>(3)` |
 
 ### 💬 Dialogs — `IDialogs`
 
@@ -177,6 +178,12 @@ public class MyViewModel(INavigator navigator)
     // Switch to a Shell resolved from DI
     await navigator.SwitchShell<MainAppShell>();
 
+    // Set or clear a numeric badge on a tab in the active Shell
+    await navigator.SetTabBadge("Inbox", 3);
+    await navigator.SetTabBadge<InboxViewModel>(7);
+    await navigator.ClearTabBadge("Inbox");
+    await navigator.ClearTabBadge<InboxViewModel>();
+
     // Fluent multi-segment navigation builder
     await navigator
         .CreateBuilder()
@@ -205,6 +212,9 @@ public class MyViewModel(INavigator navigator)
 
 > [!NOTE]
 > If you're setting arguments on the ViewModel navigation, you should make them observable if they are bound on the Page.
+
+> [!IMPORTANT]
+> Tab badges only work for routes that are already present as tabs in the active Shell. The badge APIs are supported on Android, iOS, Mac Catalyst, and Windows. Linux and macOS AppKit throw `PlatformNotSupportedException`.
 
 ### 5. Dialogs
 

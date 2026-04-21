@@ -50,6 +50,23 @@
                     Command="{Binding NavToOneCommand}"
                     HorizontalOptions="Fill" />
 
+            <Label Text="--- Tab Badges ---"
+                   FontAttributes="Bold" />
+
+            <Button Text="Set Badge Tab = 1"
+                    Command="{Binding SetBadgeTabCommand}"
+                    CommandParameter="1"
+                    HorizontalOptions="Fill" />
+
+            <Button Text="Set Badge Tab = 5"
+                    Command="{Binding SetBadgeTabCommand}"
+                    CommandParameter="5"
+                    HorizontalOptions="Fill" />
+
+            <Button Text="Clear Badge Tab"
+                    Command="{Binding ClearBadgeTabCommand}"
+                    HorizontalOptions="Fill" />
+
             <Button Text="Builder Chain (One > Another > Two)"
                     Command="{Binding NavBuilderChainCommand}"
                     HorizontalOptions="Fill" />

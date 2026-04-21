@@ -10,6 +10,9 @@
         <ShellContent Title="Home"
                       ContentTemplate="{DataTemplate local:MainPage}"
                       Route="MainPage" />
+        <ShellContent Title="Badge Tab"
+                      ContentTemplate="{DataTemplate local:BadgeTabPage}"
+                      Route="BadgeTab" />
     </TabBar>
 
 </shiny:ShinyShell>

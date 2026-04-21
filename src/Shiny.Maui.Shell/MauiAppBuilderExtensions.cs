@@ -15,6 +15,7 @@ public static class MauiAppBuilderExtensions
             builder.Services.AddSingleton(navBuilder);
             builder.Services.TryAddSingleton<IMainThread, MauiMainThread>();
             builder.Services.TryAddSingleton<IDialogs, ShellDialogs>();
+            builder.Services.AddSingleton<ShellTabBadgeManager>();
             
             builder.Services.AddSingleton<ShellServices>();
             builder.Services.AddSingleton<ShinyShellNavigator>();

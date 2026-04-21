@@ -1,8 +1,10 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
-        <TargetFramework>$(BaseTargetFramework)</TargetFramework>
+        <TargetFrameworks>$(BaseTargetFramework);$(BaseTargetFramework)-android;$(BaseTargetFramework)-ios;$(BaseTargetFramework)-maccatalyst</TargetFrameworks>
+        <TargetFrameworks Condition="$([MSBuild]::IsOSPlatform('windows'))">$(TargetFrameworks);$(BaseTargetFramework)-windows10.0.19041.0</TargetFrameworks>
         <RootNamespace>Shiny</RootNamespace>
+        <EnableDefaultMauiMacCatalystTarget>false</EnableDefaultMauiMacCatalystTarget>
     </PropertyGroup>
 
     <ItemGroup>
