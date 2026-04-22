@@ -378,7 +378,7 @@ public class ShinyShellNavigator(
     {
         if (page.BindingContext is IPageLifecycleAware lc)
         {
-            logger.LogDebug("[OnAppearing] ViewModel '{type}' ", lc.GetType());
+            logger.LogDebug("[OnDisappearing] ViewModel '{type}' ", lc.GetType());
             lc.OnDisappearing();
         }
     }
