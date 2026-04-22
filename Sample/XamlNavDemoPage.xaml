@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:sample="clr-namespace:Sample"
+             xmlns:shiny="clr-namespace:Shiny;assembly=Shiny.Maui.Shell"
+             x:DataType="sample:XamlNavDemoViewModel"
+             x:Class="Sample.XamlNavDemoPage"
+             Title="XAML Navigation">
+
+    <ContentPage.ToolbarItems>
+        <ToolbarItem Text="Detail"
+                     shiny:Navigate.Route="DetailPage"
+                     shiny:Navigate.ParameterKey="Text"
+                     shiny:Navigate.ParameterValue="From ToolbarItem" />
+    </ContentPage.ToolbarItems>
+
+    <ScrollView>
+        <VerticalStackLayout Padding="20" Spacing="12">
+
+            <Label Text="These buttons navigate using XAML-only Navigate attached properties — no ViewModel commands needed."
+                   TextColor="{AppThemeBinding Light=Gray, Dark=LightGray}" />
+
+            <Label Text="Parameter:" />
+            <Entry Text="{Binding NavArg}" Placeholder="Enter text..." />
+
+            <BoxView HeightRequest="1" Color="LightGray" Margin="0,8" />
+
+            <Label Text="Button with Route + Parameter" FontAttributes="Bold" />
+            <Button Text="Navigate to Detail"
+                    shiny:Navigate.Route="DetailPage"
+                    shiny:Navigate.ParameterKey="Text"
+                    shiny:Navigate.ParameterValue="{Binding NavArg}" />
+
+            <Label Text="Button with Route Only" FontAttributes="Bold" />
+            <Button Text="Navigate to Detail (no params)"
+                    shiny:Navigate.Route="DetailPage" />
+
+            <Label Text="Absolute Navigation" FontAttributes="Bold" />
+            <Button Text="Set Root to Detail"
+                    shiny:Navigate.Route="DetailPage"
+                    shiny:Navigate.RelativeNavigation="False"
+                    shiny:Navigate.ParameterKey="Text"
+                    shiny:Navigate.ParameterValue="Absolute nav" />
+
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>

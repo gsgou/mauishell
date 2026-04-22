@@ -4,15 +4,14 @@
                   xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
                   xmlns:shiny="clr-namespace:Shiny;assembly=Shiny.Maui.Shell"
                   xmlns:local="clr-namespace:Sample"
-                  Title="Sample (Tabbed)">
+                  Title="Shiny Shell (Tabbed)">
 
     <TabBar>
         <ShellContent Title="Home"
-                      ContentTemplate="{DataTemplate local:MainPage}"
-                      Route="MainPage" />
-        <ShellContent Title="Badge Tab"
-                      ContentTemplate="{DataTemplate local:BadgeTabPage}"
-                      Route="BadgeTab" />
+                      ContentTemplate="{DataTemplate local:HomePage}"
+                      Route="HomePage" />
+        <ShellContent Title="Badges"
+                      ContentTemplate="{DataTemplate local:BadgeDemoPage}"
+                      Route="BadgeDemoPage" />
     </TabBar>
-
 </shiny:ShinyShell>

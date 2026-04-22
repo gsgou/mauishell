@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:sample="clr-namespace:Sample"
+             x:DataType="sample:LifecycleDemoViewModel"
+             x:Class="Sample.LifecycleDemoPage"
+             Title="Lifecycle">
+
+    <Grid RowDefinitions="Auto,*,Auto" Padding="20" RowSpacing="12">
+
+        <VerticalStackLayout Spacing="4">
+            <Label Text="Lifecycle events are logged below as they fire on this ViewModel."
+                   TextColor="{AppThemeBinding Light=Gray, Dark=LightGray}" />
+            <Label Text="Interfaces: IPageLifecycleAware, INavigationAware, INavigationConfirmation, IDisposable"
+                   FontSize="11"
+                   TextColor="{AppThemeBinding Light=Gray, Dark=LightGray}" />
+        </VerticalStackLayout>
+
+        <CollectionView Grid.Row="1" ItemsSource="{Binding Events}">
+            <CollectionView.ItemTemplate>
+                <DataTemplate x:DataType="x:String">
+                    <Label Text="{Binding .}" FontFamily="OpenSansRegular" FontSize="13" Padding="0,2" />
+                </DataTemplate>
+            </CollectionView.ItemTemplate>
+        </CollectionView>
+
+        <HorizontalStackLayout Grid.Row="2" Spacing="10" HorizontalOptions="Center">
+            <Button Text="Push Detail"
+                    Command="{Binding PushDetailCommand}" />
+            <Button Text="Clear Log"
+                    Command="{Binding ClearCommand}" />
+        </HorizontalStackLayout>
+    </Grid>
+</ContentPage>

@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:sample="clr-namespace:Sample"
+             x:DataType="sample:BuilderDemoViewModel"
+             x:Class="Sample.BuilderDemoPage"
+             Title="Builder Chain">
+
+    <ScrollView>
+        <VerticalStackLayout Padding="20" Spacing="12">
+
+            <Label Text="The navigation builder creates multi-segment navigation chains in a single call."
+                   TextColor="{AppThemeBinding Light=Gray, Dark=LightGray}" />
+
+            <Label Text="Chain Navigation" FontAttributes="Bold" FontSize="16" Padding="0,10,0,0" />
+
+            <Button Text="Push 3 Details in a Chain"
+                    Command="{Binding ChainThreeCommand}" />
+
+            <Button Text="Push Detail then Modal target"
+                    Command="{Binding ChainWithModalCommand}" />
+
+            <BoxView HeightRequest="1" Color="LightGray" Margin="0,8" />
+
+            <Label Text="Pop + Push" FontAttributes="Bold" FontSize="16" />
+            <Label Text="Replaces current page by popping then pushing."
+                   TextColor="{AppThemeBinding Light=Gray, Dark=LightGray}" />
+
+            <Button Text="Pop 1 and Push Detail"
+                    Command="{Binding PopAndPushCommand}" />
+
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>

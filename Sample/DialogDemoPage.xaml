@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:sample="clr-namespace:Sample"
+             x:DataType="sample:DialogDemoViewModel"
+             x:Class="Sample.DialogDemoPage"
+             Title="Dialogs">
+
+    <ScrollView>
+        <VerticalStackLayout Padding="20" Spacing="12">
+
+            <Label Text="All dialogs use the IDialogs abstraction, backed by UxDivers Popups in this sample."
+                   TextColor="{AppThemeBinding Light=Gray, Dark=LightGray}" />
+
+            <Button Text="Alert"
+                    Command="{Binding ShowAlertCommand}" />
+
+            <Button Text="Confirm"
+                    Command="{Binding ShowConfirmCommand}" />
+
+            <Button Text="Prompt"
+                    Command="{Binding ShowPromptCommand}" />
+
+            <Button Text="Action Sheet"
+                    Command="{Binding ShowActionSheetCommand}" />
+
+            <BoxView HeightRequest="1" Color="LightGray" Margin="0,8" />
+
+            <Label Text="Last Result" FontAttributes="Bold" FontSize="16" />
+            <Label Text="{Binding LastResult}" />
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>

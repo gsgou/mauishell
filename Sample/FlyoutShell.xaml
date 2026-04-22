@@ -4,15 +4,11 @@
                   xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
                   xmlns:shiny="clr-namespace:Shiny;assembly=Shiny.Maui.Shell"
                   xmlns:local="clr-namespace:Sample"
-                  Title="Sample (Flyout)"
+                  Title="Shiny Shell (Flyout)"
                   FlyoutBehavior="Flyout">
 
     <FlyoutItem Title="Home">
-        <ShellContent ContentTemplate="{DataTemplate local:MainPage}"
-                      Route="MainPage" />
+        <ShellContent ContentTemplate="{DataTemplate local:HomePage}"
+                      Route="HomePage" />
     </FlyoutItem>
-
-    <MenuItem Text="Switch to Standard" Clicked="OnSwitchToStandard" />
-    <MenuItem Text="Switch to Tabbed" Clicked="OnSwitchToTabbed" />
-
 </shiny:ShinyShell>

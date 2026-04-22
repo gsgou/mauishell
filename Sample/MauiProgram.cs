@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging;
 using Shiny;
 
 namespace Sample;
@@ -10,7 +10,6 @@ public static class MauiProgram
         var builder = MauiApp
             .CreateBuilder()
             .UseMauiApp<App>()
-            .UseUxDiversDialogs()
             .UseShinyShell(x => x
                 .UseUxDiversDialogs()
                 .AddGeneratedMaps()

@@ -4,9 +4,9 @@
                   xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
                   xmlns:shiny="clr-namespace:Shiny;assembly=Shiny.Maui.Shell"
                   xmlns:local="clr-namespace:Sample"
-                  Title="Sample">
+                  Title="Shiny Shell">
 
     <ShellContent Title="Home"
-                  ContentTemplate="{DataTemplate local:MainPage}"
-                  Route="MainPage" />
+                  ContentTemplate="{DataTemplate local:HomePage}"
+                  Route="HomePage" />
 </shiny:ShinyShell>

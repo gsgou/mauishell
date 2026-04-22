@@ -5,6 +5,8 @@ namespace Shiny;
 
 public sealed class ShinyAppBuilder(MauiAppBuilder builder)
 {
+    public MauiAppBuilder MauiBuilder => builder;
+    
     readonly Dictionary<string, (bool RegisterRoute, Type PageType, Type ViewModelType)> typeMap = new();
 
     /// <summary>

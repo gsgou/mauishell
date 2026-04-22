@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:sample="clr-namespace:Sample"
+             x:DataType="sample:NavigationDemoViewModel"
+             x:Class="Sample.NavigationDemoPage"
+             Title="Push &amp; Pop">
+
+    <ScrollView>
+        <VerticalStackLayout Padding="20" Spacing="12">
+
+            <Label Text="Parameter to pass:" />
+            <Entry Text="{Binding Arg}" Placeholder="Enter text..." />
+
+            <Label Text="Push Navigation" FontAttributes="Bold" FontSize="16" Padding="0,10,0,0" />
+
+            <Button Text="Push by Route"
+                    Command="{Binding PushByRouteCommand}" />
+
+            <Button Text="Push by ViewModel"
+                    Command="{Binding PushByViewModelCommand}" />
+
+            <Button Text="Push by ViewModel (configure)"
+                    Command="{Binding PushByViewModelConfigureCommand}" />
+
+            <Label Text="Pop Navigation" FontAttributes="Bold" FontSize="16" Padding="0,10,0,0" />
+
+            <Button Text="Go Back"
+                    Command="{Binding GoBackCommand}" />
+
+            <Label Text="{Binding BackResult, StringFormat='Back result: {0}'}"
+                   IsVisible="{Binding HasBackResult}" />
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>

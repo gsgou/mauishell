@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:sample="clr-namespace:Sample"
+             x:DataType="sample:ShellTestViewModel"
+             x:Class="Sample.ShellTestPage"
+             Title="Shell Switching">
+
+    <ScrollView>
+        <VerticalStackLayout Padding="20" Spacing="12">
+
+            <Label Text="Switch the entire Shell at runtime. Changes are not persisted — the app always starts with the standard Shell."
+                   TextColor="{AppThemeBinding Light=Gray, Dark=LightGray}" />
+
+            <Label Text="{Binding CurrentShellType, StringFormat='Current: {0}'}"
+                   FontAttributes="Bold" FontSize="16" />
+
+            <Button Text="Switch to Standard"
+                    Command="{Binding SwitchCommand}"
+                    CommandParameter="Standard" />
+
+            <Button Text="Switch to Tabbed"
+                    Command="{Binding SwitchCommand}"
+                    CommandParameter="Tabbed" />
+
+            <Button Text="Switch to Flyout"
+                    Command="{Binding SwitchCommand}"
+                    CommandParameter="Flyout" />
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>

@@ -4,8 +4,5 @@ namespace Sample;
 
 public partial class TabbedShell : ShinyShell
 {
-    public TabbedShell()
-    {
-        this.InitializeComponent();
-    }
+    public TabbedShell() => this.InitializeComponent();
 }
