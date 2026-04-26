@@ -55,7 +55,7 @@ Inspired by [Prism Library](https://prismlibrary.com) by Dan Siegel and Brian La
 | `IPageLifecycleAware` | `OnAppearing()` / `OnDisappearing()` | Page visibility hooks |
 | `INavigationConfirmation` | `Task<bool> CanNavigate()` | Guard navigation (unsaved changes, etc.) |
 | `INavigationAware` | `OnNavigatingFrom(params)` | Mutate parameters before leaving |
-| `IQueryAttributable` | `ApplyQueryAttributes(params)` | Receive navigation parameters |
+| `IQueryAttributable` | `ApplyQueryAttributes(params)` | Receive navigation parameters (only for string-based `NavigateTo` — not needed with `[ShellProperty]`) |
 | `IDisposable` | `Dispose()` | Cleanup when page leaves the stack |
 
 ### ⚡ Source Generation
@@ -356,7 +356,6 @@ Implement these interfaces on your ViewModels as needed. Works just like [Prism 
 ```csharp
 [ShellMap<DetailPage>("Detail", description: "Navigate to the detail page")]
 public partial class DetailViewModel(INavigator navigator, IDialogs dialogs) : ObservableObject,
-    IQueryAttributable,
     IPageLifecycleAware,
     INavigationConfirmation,
     IDisposable
@@ -364,12 +363,6 @@ public partial class DetailViewModel(INavigator navigator, IDialogs dialogs) : O
     [ShellProperty("The item identifier")]
     [ObservableProperty]
     string itemId;
-
-    public void ApplyQueryAttributes(IDictionary<string, object> query)
-    {
-        if (query.TryGetValue(nameof(ItemId), out var id))
-            ItemId = id?.ToString();
-    }
 
     public void OnAppearing() { /* load data */ }
     public void OnDisappearing() { /* pause */ }
@@ -470,7 +463,7 @@ public static class AiExtensions
 
     public static GeneratedRouteInfo[] GetAiToolApplicableGeneratedRoutes(this INavigator navigator) => ...;
 
-    public static string AiRoutePrompt { get; } = "Available routes:\n- Route \"Detail\": ...";
+    public static string AiRoutePrompt(this INavigator navigator) => "Available routes:\n- Route \"Detail\": ...";
 
     public static async Task<string> NavigateToRoute(this INavigator navigator,
         string route, Dictionary<string, string>? args = null)
@@ -600,7 +593,7 @@ The AI calls `GetAiToolApplicableGeneratedRoutes` to discover what pages exist a
 You can also seed the AI with route info upfront via the generated `AiRoutePrompt`:
 
 ```csharp
-history.Add(new ChatMessage(ChatRole.System, AiExtensions.AiRoutePrompt));
+history.Add(new ChatMessage(ChatRole.System, navigator.AiRoutePrompt()));
 ```
 
 ### GeneratedRouteParameter

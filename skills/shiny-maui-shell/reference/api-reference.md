@@ -486,7 +486,7 @@ public static class AiExtensions
     public static GeneratedRouteInfo[] GetAiToolApplicableGeneratedRoutes(this INavigator navigator);
 
     // Pre-formatted prompt string for seeding AI system messages
-    public static string AiRoutePrompt { get; }
+    public static string AiRoutePrompt(this INavigator navigator);
 
     // AI-friendly navigation using switch dispatch to NavigateTo<TViewModel>
     // String values are automatically converted to the target property type:
@@ -719,7 +719,7 @@ Registers:
 
 ## IQueryAttributable (MAUI Built-in)
 
-Standard MAUI interface for receiving navigation parameters. Must be implemented on ViewModels that receive arguments.
+Standard MAUI interface for receiving navigation parameters. Only needed when using string-based `NavigateTo(route, args)` with tuple parameters. **Not required** when using `[ShellProperty]` — the source-generated navigation methods set properties directly.
 
 ```csharp
 // From Microsoft.Maui.Controls
@@ -741,9 +741,9 @@ When implemented on a ViewModel, `Dispose()` is called when the page is permanen
 - Check that `UseShinyShell()` is called in MauiProgram.cs
 
 ### Navigation parameters not received
-- ViewModel must implement `IQueryAttributable`
+- When using `[ShellProperty]`, properties are set directly by generated methods — no `IQueryAttributable` needed
+- When using string-based `NavigateTo(route, args)` with tuples, the ViewModel must implement `IQueryAttributable`
 - Parameter keys are case-sensitive and must match property names
-- When using `NavigateTo<TViewModel>(configure)`, properties set via `configure` are available immediately (no need for `IQueryAttributable`)
 
 ### Page not found during navigation
 - Pages in AppShell.xaml should use `registerRoute: false`

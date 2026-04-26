@@ -158,12 +158,12 @@ public partial class ChatViewModel(
             .Build();
 
         history.Clear();
-        Debug.WriteLine($"[AI] AiRoutePrompt:\n{AiExtensions.AiRoutePrompt}");
+        Debug.WriteLine($"[AI] AiRoutePrompt:\n{navigator.AiRoutePrompt()}");
         history.Add(new AIChatMessage(ChatRole.System,
             $"""
             You are a helpful assistant integrated in a .NET MAUI app. You can navigate the user to pages and pre-fill forms using the NavigateToRoute tool.
 
-            {AiExtensions.AiRoutePrompt}
+            {navigator.AiRoutePrompt()}
             When the user describes a problem, request, or intent that matches a route, call NavigateToRoute immediately with the appropriate route and parameters inferred from what the user said. Do not ask the user to confirm parameters unless something is genuinely ambiguous.
 
             When the user first greets you or asks what you can do, briefly describe your capabilities based on the available routes above.
@@ -192,8 +192,6 @@ public partial class ChatViewModel(
             SenderId = "user"
         });
 
-        history.Add(new AIChatMessage(ChatRole.User, text));
-
         try
         {
             IsBusy = true;
@@ -206,7 +204,13 @@ public partial class ChatViewModel(
 
             var options = new ChatOptions { Tools = [.. tools] };
 
-            var response = await chatClient.GetResponseAsync(history, options, cts.Token);
+            // Send only the system prompt + the current user message (not full history)
+            var messages = new List<AIChatMessage>
+            {
+                history[0], // system prompt
+                new AIChatMessage(ChatRole.User, text)
+            };
+            var response = await chatClient.GetResponseAsync(messages, options, cts.Token);
 
             Debug.WriteLine($"[AI] Response messages: {response.Messages.Count}");
             foreach (var msg in response.Messages)
@@ -235,7 +239,6 @@ public partial class ChatViewModel(
             var assistantText = response.Text ?? "(no response)";
             Debug.WriteLine($"[AI] Final text: {assistantText}");
 
-            history.Add(new AIChatMessage(ChatRole.Assistant, assistantText));
             Messages.Add(new ChatMessage
             {
                 Text = assistantText,

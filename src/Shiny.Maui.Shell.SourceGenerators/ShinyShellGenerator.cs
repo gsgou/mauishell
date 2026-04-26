@@ -701,7 +701,7 @@ public class ShinyShellGenerator : IIncrementalGenerator
             sb.AppendLine("    /// A pre-formatted prompt string describing all AI-applicable routes, their descriptions, and parameters.");
             sb.AppendLine("    /// Designed to be included in an AI system message so the model knows which routes are available without calling a discovery tool first.");
             sb.AppendLine("    /// </summary>");
-            sb.AppendLine("    public static string AiRoutePrompt { get; } =");
+            sb.AppendLine("    public static string AiRoutePrompt(this global::Shiny.INavigator navigator) =>");
 
             var promptBuilder = new StringBuilder();
             promptBuilder.Append("Available routes:\\n");
