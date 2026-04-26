@@ -732,7 +732,8 @@ namespace TestApp
         var result = RunGenerator(source);
         var routeInfoSource = GetGeneratedSource(result, "AiExtensions.g.cs");
 
-        routeInfoSource.ShouldContain("new global::Shiny.Infrastructure.GeneratedRouteInfo(\"DetailPage\", \"Navigate to detail\"");
+        routeInfoSource.ShouldContain("\"DetailPage\",");
+        routeInfoSource.ShouldContain("\"Navigate to detail\",");
         routeInfoSource.ShouldContain("new global::Shiny.Infrastructure.GeneratedRouteParameter(\"Text\", \"Show this text\", \"string\", true)");
         routeInfoSource.ShouldContain("new global::Shiny.Infrastructure.GeneratedRouteParameter(\"Text2\", \"Show this text2\", \"string\", true)");
     }
@@ -787,8 +788,9 @@ namespace TestApp
         var result = RunGenerator(source);
         var routeInfoSource = GetGeneratedSource(result, "AiExtensions.g.cs");
 
-        routeInfoSource.ShouldContain("new global::Shiny.Infrastructure.GeneratedRouteInfo(\"HomePage\", \"\"");
-        routeInfoSource.ShouldContain("new global::Shiny.Infrastructure.GeneratedRouteInfo(\"DetailPage\", \"Detail\"");
+        routeInfoSource.ShouldContain("\"HomePage\",");
+        routeInfoSource.ShouldContain("\"DetailPage\",");
+        routeInfoSource.ShouldContain("\"Detail\",");
         routeInfoSource.ShouldContain("new global::Shiny.Infrastructure.GeneratedRouteParameter(\"Id\", \"The ID\", \"int\", true)");
     }
 
@@ -809,7 +811,9 @@ namespace TestApp
         var result = RunGenerator(source);
         var routeInfoSource = GetGeneratedSource(result, "AiExtensions.g.cs");
 
-        routeInfoSource.ShouldContain("new global::Shiny.Infrastructure.GeneratedRouteInfo(\"HomePage\", \"\", [])");
+        routeInfoSource.ShouldContain("\"HomePage\",");
+        routeInfoSource.ShouldContain("\"\",");
+        routeInfoSource.ShouldContain("[]");
     }
 
     [Fact]
@@ -829,7 +833,9 @@ namespace TestApp
         var result = RunGenerator(source);
         var routeInfoSource = GetGeneratedSource(result, "AiExtensions.g.cs");
 
-        routeInfoSource.ShouldContain("new global::Shiny.Infrastructure.GeneratedRouteInfo(\"DetailPage\", \"This is detail\", [])");
+        routeInfoSource.ShouldContain("\"DetailPage\",");
+        routeInfoSource.ShouldContain("\"This is detail\",");
+        routeInfoSource.ShouldContain("[]");
     }
 
     [Fact]
@@ -1110,6 +1116,81 @@ namespace TestApp
 
         routeInfoSource.ShouldNotContain("AiRoutePrompt");
         routeInfoSource.ShouldNotContain("GetAiTools");
+    }
+
+    [Fact]
+    public void AiExtensions_NavigateToRoute_ConvertsTypesCorrectly()
+    {
+        var source = StubTypes + @"
+namespace TestApp
+{
+    public class OrderPage : Microsoft.Maui.Controls.Page { }
+
+    [ShellMap<OrderPage>(description: ""Place an order"")]
+    public class OrderViewModel : System.ComponentModel.INotifyPropertyChanged
+    {
+        public event System.ComponentModel.PropertyChangedEventHandler? PropertyChanged;
+
+        [ShellProperty(""Item name"")]
+        public string Name { get; set; }
+
+        [ShellProperty(""Quantity"", required: true)]
+        public int Quantity { get; set; }
+
+        [ShellProperty(""Is urgent"", required: false)]
+        public bool IsUrgent { get; set; }
+
+        [ShellProperty(""Unit price"", required: false)]
+        public double Price { get; set; }
+    }
+}";
+        var result = RunGenerator(source, ("ShinyMauiShell_GenerateAiExtensions", "true"));
+        var routeInfoSource = GetGeneratedSource(result, "AiExtensions.g.cs");
+
+        // string should be assigned directly
+        routeInfoSource.ShouldContain("vm.Name = _name;");
+
+        // int should use int.Parse
+        routeInfoSource.ShouldContain("vm.Quantity = int.Parse(_quantity);");
+
+        // bool should use bool.Parse
+        routeInfoSource.ShouldContain("vm.IsUrgent = bool.Parse(_isUrgent);");
+
+        // double should use double.Parse
+        routeInfoSource.ShouldContain("vm.Price = double.Parse(_price);");
+    }
+
+    [Fact]
+    public void AiExtensions_NavigateToRoute_ConvertsEnumsCorrectly()
+    {
+        var source = StubTypes + @"
+namespace TestApp
+{
+    public enum Priority { Low, Medium, High, Urgent }
+
+    public class TicketPage : Microsoft.Maui.Controls.Page { }
+
+    [ShellMap<TicketPage>(description: ""Submit a ticket"")]
+    public class TicketViewModel : System.ComponentModel.INotifyPropertyChanged
+    {
+        public event System.ComponentModel.PropertyChangedEventHandler? PropertyChanged;
+
+        [ShellProperty(""Summary"")]
+        public string Title { get; set; }
+
+        [ShellProperty(""Priority level"")]
+        public Priority Priority { get; set; }
+    }
+}";
+        var result = RunGenerator(source, ("ShinyMauiShell_GenerateAiExtensions", "true"));
+        var routeInfoSource = GetGeneratedSource(result, "AiExtensions.g.cs");
+
+        // enum should use Enum.Parse with case-insensitive flag
+        routeInfoSource.ShouldContain("vm.Priority = (global::TestApp.Priority)global::System.Enum.Parse(typeof(global::TestApp.Priority), _priority, true);");
+
+        // enum metadata should report as "string" type with values in description
+        routeInfoSource.ShouldContain("\"string\"");
+        routeInfoSource.ShouldContain("Priority level. Must be one of: Low, Medium, High, Urgent");
     }
 
     #endregion

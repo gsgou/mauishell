@@ -566,14 +566,16 @@ Shiny MAUI Shell's source generation produces metadata and navigation methods de
 1. **Describe your routes** — Add `description` to `[ShellMap]` and `[ShellProperty]` to explain what each page does and what its parameters mean:
 
 ```csharp
+public enum WorkOrderPriority { Low, Medium, High, Urgent }
+
 [ShellMap<WorkOrderPage>(description: "Use when the user reports something broken, malfunctioning, or needing repair")]
-public partial class WorkOrderViewModel : ObservableObject, IQueryAttributable
+public partial class WorkOrderViewModel : ObservableObject
 {
     [ShellProperty("Summarize what is broken based on what the user said", required: true)]
     public string Description { get; set; } = string.Empty;
 
     [ShellProperty("Infer urgency from tone. Must be: Low, Medium, High, or Urgent", required: true)]
-    public string Priority { get; set; } = "Medium";
+    public WorkOrderPriority Priority { get; set; } = WorkOrderPriority.Medium;
 }
 ```
 
@@ -593,7 +595,7 @@ var options = new ChatOptions { Tools = [.. tools] };
 var response = await chatClient.GetResponseAsync(history, options);
 ```
 
-The AI calls `GetAiToolApplicableGeneratedRoutes` to discover what pages exist and what they do, then calls `NavigateToRoute` with the appropriate route and parameters extracted from the user's message. `NavigateToRoute` dispatches to `NavigateTo<TViewModel>` with direct property setters — no string-based Shell navigation involved.
+The AI calls `GetAiToolApplicableGeneratedRoutes` to discover what pages exist and what they do, then calls `NavigateToRoute` with the appropriate route and parameters extracted from the user's message. `NavigateToRoute` dispatches to `NavigateTo<TViewModel>` with direct property setters — no string-based Shell navigation involved. String values from the AI are automatically converted to the target property type (`int`, `bool`, `double`, enums, `DateTime`, etc.).
 
 You can also seed the AI with route info upfront via the generated `AiRoutePrompt`:
 

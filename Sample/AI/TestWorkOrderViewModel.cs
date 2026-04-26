@@ -2,6 +2,14 @@ using Shiny;
 
 namespace Sample.AI;
 
+public enum WorkOrderPriority
+{
+    Low,
+    Medium,
+    High,
+    Urgent
+}
+
 [ShellMap<TestWorkOrderPage>(description: "Use when the user reports something broken, malfunctioning, needing repair, maintenance, or service. Examples: equipment failures, outages, leaks, HVAC issues, or any physical problem that needs to be fixed.")]
 public partial class TestWorkOrderViewModel(INavigator navigator) : ObservableObject
 {
@@ -11,7 +19,7 @@ public partial class TestWorkOrderViewModel(INavigator navigator) : ObservableOb
 
     [ShellProperty("Infer the urgency from the user's tone and words. Must be one of: Low, Medium, High, Urgent", required: true)]
     [ObservableProperty]
-    public partial string Priority { get; set; } = "Medium";
+    public partial WorkOrderPriority Priority { get; set; } = WorkOrderPriority.Medium;
 
     [ShellProperty("The physical location if the user mentioned one, otherwise leave empty", required: false)]
     [ObservableProperty]

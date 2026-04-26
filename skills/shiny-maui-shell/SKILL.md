@@ -416,24 +416,16 @@ Shiny MAUI Shell generates AI-compatible route metadata and navigation methods f
 **Describe routes for AI** — Add `description` to `[ShellMap]` and `[ShellProperty]`:
 
 ```csharp
+public enum WorkOrderPriority { Low, Medium, High, Urgent }
+
 [ShellMap<WorkOrderPage>(description: "Use when the user reports something broken or needing repair")]
-public partial class WorkOrderViewModel : ObservableObject, IQueryAttributable
+public partial class WorkOrderViewModel : ObservableObject
 {
     [ShellProperty("Summarize what is broken based on what the user said", required: true)]
     public string Description { get; set; } = string.Empty;
 
     [ShellProperty("Infer urgency from tone. Must be: Low, Medium, High, or Urgent", required: true)]
-    public string Priority { get; set; } = "Medium";
-
-    public void ApplyQueryAttributes(IDictionary<string, object> query)
-    {
-        if (query.TryGetValue("Description", out var desc))
-            Description = desc?.ToString() ?? string.Empty;
-        if (query.TryGetValue("Priority", out var p))
-            Priority = p?.ToString() ?? "Medium";
-        OnPropertyChanged(nameof(Description));
-        OnPropertyChanged(nameof(Priority));
-    }
+    public WorkOrderPriority Priority { get; set; } = WorkOrderPriority.Medium;
 }
 ```
 
@@ -441,7 +433,7 @@ public partial class WorkOrderViewModel : ObservableObject, IQueryAttributable
 
 - `GetGeneratedRouteInfo()` — returns all routes with parameter metadata (name, description, CLR type, required/optional)
 - `GetAiToolApplicableGeneratedRoutes()` — returns only routes that have a description AND at least one parameter (routes an AI can meaningfully act on)
-- `NavigateToRoute(route, args)` — AI-friendly navigation using switch dispatch to `NavigateTo<TViewModel>` with direct property setters. Returns `Task<string>` with a confirmation message
+- `NavigateToRoute(route, args)` — AI-friendly navigation using switch dispatch to `NavigateTo<TViewModel>` with direct property setters and automatic type conversion (`int`, `bool`, `double`, enums, `DateTime`, etc.). Returns `Task<string>` with a confirmation message
 - `GetAiTools()` — returns ready-to-use `IList<AITool>` instances for route discovery and navigation
 - `AiRoutePrompt` — pre-formatted string describing all AI-applicable routes for seeding AI system messages
 
@@ -456,7 +448,8 @@ var options = new ChatOptions { Tools = [.. tools] };
 - Route descriptions should describe **user intent signals**, not just the page name — e.g. "Use when the user reports something broken" not "Work order page"
 - Property descriptions should tell the AI to **infer values** from natural language — e.g. "Infer urgency from tone" not "The priority level"
 - Use `GetAiToolApplicableGeneratedRoutes` (not `GetGeneratedRouteInfo`) to keep the AI focused on actionable routes
-- ViewModels must implement `IQueryAttributable` to receive the `NavigateToRoute` args
+- Properties can be `string`, `int`, `bool`, `double`, enums, `DateTime`, `Guid`, etc. — the generated `NavigateToRoute` handles type conversion automatically
+- Enums are especially AI-friendly — the model outputs the member name as a string and the generator parses it case-insensitively
 
 ### 6. Dialogs
 

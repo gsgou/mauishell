@@ -16,11 +16,11 @@
             <Label Text="Priority" FontAttributes="Bold" />
             <Picker SelectedItem="{Binding Priority}">
                 <Picker.ItemsSource>
-                    <x:Array Type="{x:Type x:String}">
-                        <x:String>Low</x:String>
-                        <x:String>Medium</x:String>
-                        <x:String>High</x:String>
-                        <x:String>Urgent</x:String>
+                    <x:Array Type="{x:Type ai:WorkOrderPriority}">
+                        <ai:WorkOrderPriority>Low</ai:WorkOrderPriority>
+                        <ai:WorkOrderPriority>Medium</ai:WorkOrderPriority>
+                        <ai:WorkOrderPriority>High</ai:WorkOrderPriority>
+                        <ai:WorkOrderPriority>Urgent</ai:WorkOrderPriority>
                     </x:Array>
                 </Picker.ItemsSource>
             </Picker>

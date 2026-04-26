@@ -289,11 +289,25 @@ public class ShinyShellGenerator : IIncrementalGenerator
                             }
                             else
                             {
+                                var typeSymbol = propertySymbol.Type;
+                                var enumType = typeSymbol.TypeKind == TypeKind.Enum
+                                    ? (INamedTypeSymbol)typeSymbol
+                                    : typeSymbol is INamedTypeSymbol { IsGenericType: true, ConstructedFrom.SpecialType: SpecialType.System_Nullable_T } nullableType &&
+                                      nullableType.TypeArguments[0].TypeKind == TypeKind.Enum
+                                        ? (INamedTypeSymbol)nullableType.TypeArguments[0]
+                                        : null;
+
+                                var enumValues = enumType != null
+                                    ? enumType.GetMembers().OfType<IFieldSymbol>().Where(f => f.HasConstantValue).Select(f => f.Name).ToImmutableArray()
+                                    : ImmutableArray<string>.Empty;
+
                                 properties.Add(new ShellPropertyInfo(
                                     member.Identifier.ValueText,
                                     propertySymbol.Type.ToDisplayString(),
                                     isRequired,
-                                    propDescription
+                                    propDescription,
+                                    enumType != null,
+                                    enumValues
                                 ));
                             }
                         }
@@ -609,20 +623,32 @@ public class ShinyShellGenerator : IIncrementalGenerator
                 ? $"\"{EscapeString(cls.Description)}\""
                 : "\"\"";
 
-            sb.Append($"        new global::Shiny.Infrastructure.GeneratedRouteInfo(\"{EscapeString(cls.Route)}\", {descriptionArg}, [");
+            sb.AppendLine($"        new global::Shiny.Infrastructure.GeneratedRouteInfo(");
+            sb.AppendLine($"            \"{EscapeString(cls.Route)}\",");
+            sb.AppendLine($"            {descriptionArg},");
 
             if (cls.Properties.Any())
             {
-                var paramEntries = cls.Properties.Select(p =>
+                sb.AppendLine("            [");
+                var properties = cls.Properties.ToList();
+                for (int j = 0; j < properties.Count; j++)
                 {
-                    var desc = p.Description != null ? EscapeString(p.Description) : "";
+                    var p = properties[j];
                     var requiredLiteral = p.IsRequired ? "true" : "false";
-                    return $"new global::Shiny.Infrastructure.GeneratedRouteParameter(\"{EscapeString(p.Name)}\", \"{desc}\", \"{EscapeString(p.TypeName)}\", {requiredLiteral})";
-                });
-                sb.Append(string.Join(", ", paramEntries));
+                    sb.Append($"                new global::Shiny.Infrastructure.GeneratedRouteParameter(");
+                    sb.Append($"\"{EscapeString(p.Name)}\", \"{GetParameterDescription(p)}\", \"{EscapeString(GetParameterTypeName(p))}\", {requiredLiteral})");
+                    if (j < properties.Count - 1)
+                        sb.Append(",");
+                    sb.AppendLine();
+                }
+                sb.Append("            ]");
+            }
+            else
+            {
+                sb.Append("            []");
             }
 
-            sb.Append("])");
+            sb.Append(")");
             if (i < classes.Length - 1)
                 sb.Append(",");
             sb.AppendLine();
@@ -652,10 +678,9 @@ public class ShinyShellGenerator : IIncrementalGenerator
                 for (int j = 0; j < properties.Count; j++)
                 {
                     var p = properties[j];
-                    var desc = p.Description != null ? EscapeString(p.Description) : "";
                     var requiredLiteral = p.IsRequired ? "true" : "false";
                     sb.Append($"                new global::Shiny.Infrastructure.GeneratedRouteParameter(");
-                    sb.Append($"\"{EscapeString(p.Name)}\", \"{desc}\", \"{EscapeString(p.TypeName)}\", {requiredLiteral})");
+                    sb.Append($"\"{EscapeString(p.Name)}\", \"{GetParameterDescription(p)}\", \"{EscapeString(GetParameterTypeName(p))}\", {requiredLiteral})");
                     if (j < properties.Count - 1)
                         sb.Append(",");
                     sb.AppendLine();
@@ -686,9 +711,10 @@ public class ShinyShellGenerator : IIncrementalGenerator
                 promptBuilder.Append("  Parameters:\\n");
                 foreach (var p in cls.Properties)
                 {
-                    var desc = p.Description != null ? EscapeString(p.Description) : "";
+                    var desc = GetParameterDescription(p);
+                    var typeName = GetParameterTypeName(p);
                     var req = p.IsRequired ? "required" : "optional";
-                    promptBuilder.Append($"    - {EscapeString(p.Name)} ({EscapeString(p.TypeName)}, {req}): {desc}\\n");
+                    promptBuilder.Append($"    - {EscapeString(p.Name)} ({EscapeString(typeName)}, {req}): {desc}\\n");
                 }
             }
 
@@ -714,7 +740,7 @@ public class ShinyShellGenerator : IIncrementalGenerator
                 foreach (var p in cls.Properties)
                 {
                     sb.AppendLine($"                        if (args.TryGetValue(\"{EscapeString(p.Name)}\", out var _{ToCamelCase(p.Name)}))");
-                    sb.AppendLine($"                            vm.{p.Name} = _{ToCamelCase(p.Name)};");
+                    sb.AppendLine($"                            vm.{p.Name} = {GenerateConversion(p, $"_{ToCamelCase(p.Name)}")};");
                 }
 
                 sb.AppendLine("                    }");
@@ -741,7 +767,30 @@ public class ShinyShellGenerator : IIncrementalGenerator
             sb.AppendLine("        global::Microsoft.Extensions.AI.AIFunctionFactory.Create(");
             sb.AppendLine($"            (string route, global::System.Collections.Generic.Dictionary<string, string>? args) => navigator.{options.AiNavigateMethodName}(route, args),");
             sb.AppendLine($"            name: \"{options.AiNavigateMethodName}\",");
-            sb.AppendLine("            description: \"Navigate to a route in the application, passing parameters as key-value pairs. Returns a confirmation message.\")");
+
+            // Build a rich description that includes all route parameter schemas so the AI knows exactly what keys to pass
+            var navDescBuilder = new StringBuilder();
+            navDescBuilder.Append("Navigate to a route in the application. The 'args' parameter is a dictionary of key-value pairs where keys are parameter names from the route schema. ");
+            navDescBuilder.Append("Available routes and their parameters: ");
+            foreach (var cls in aiClasses)
+            {
+                navDescBuilder.Append($"{cls.Route}(");
+                var props = cls.Properties.ToList();
+                for (int j = 0; j < props.Count; j++)
+                {
+                    var p = props[j];
+                    navDescBuilder.Append(p.Name);
+                    if (p.IsEnum && !p.EnumValues.IsDefaultOrEmpty)
+                        navDescBuilder.Append($": {string.Join("|", p.EnumValues)}");
+                    if (!p.IsRequired)
+                        navDescBuilder.Append("?");
+                    if (j < props.Count - 1)
+                        navDescBuilder.Append(", ");
+                }
+                navDescBuilder.Append(") ");
+            }
+
+            sb.AppendLine($"            description: \"{EscapeString(navDescBuilder.ToString().TrimEnd())}\")");
             sb.AppendLine("    ];");
         }
 
@@ -776,6 +825,56 @@ public class ShinyShellGenerator : IIncrementalGenerator
     {
         return typeName.EndsWith("?") || typeName == "string" ? "null" : "default";
     }
+
+    static string GetParameterTypeName(ShellPropertyInfo p)
+    {
+        if (p.IsEnum)
+            return "string";
+        return p.TypeName;
+    }
+
+    static string GetParameterDescription(ShellPropertyInfo p)
+    {
+        var desc = p.Description != null ? EscapeString(p.Description) : "";
+        if (p.IsEnum && !p.EnumValues.IsDefaultOrEmpty)
+        {
+            var values = string.Join(", ", p.EnumValues);
+            desc = string.IsNullOrEmpty(desc)
+                ? $"Must be one of: {values}"
+                : $"{desc}. Must be one of: {values}";
+        }
+        return desc;
+    }
+
+    static string GenerateConversion(ShellPropertyInfo prop, string varName)
+    {
+        var typeName = prop.TypeName;
+
+        // Strip nullable wrapper for conversion logic
+        var baseType = typeName.EndsWith("?") ? typeName.Substring(0, typeName.Length - 1) : typeName;
+
+        if (prop.IsEnum)
+            return $"(global::{baseType})global::System.Enum.Parse(typeof(global::{baseType}), {varName}, true)";
+
+        return baseType switch
+        {
+            "string" => varName,
+            "int" or "System.Int32" => $"int.Parse({varName})",
+            "long" or "System.Int64" => $"long.Parse({varName})",
+            "short" or "System.Int16" => $"short.Parse({varName})",
+            "byte" or "System.Byte" => $"byte.Parse({varName})",
+            "float" or "System.Single" => $"float.Parse({varName})",
+            "double" or "System.Double" => $"double.Parse({varName})",
+            "decimal" or "System.Decimal" => $"decimal.Parse({varName})",
+            "bool" or "System.Boolean" => $"bool.Parse({varName})",
+            "System.Guid" => $"global::System.Guid.Parse({varName})",
+            "System.DateTime" => $"global::System.DateTime.Parse({varName})",
+            "System.DateTimeOffset" => $"global::System.DateTimeOffset.Parse({varName})",
+            "System.TimeSpan" => $"global::System.TimeSpan.Parse({varName})",
+            "System.Uri" => $"new global::System.Uri({varName})",
+            _ => $"({typeName})global::System.Convert.ChangeType({varName}, typeof({baseType}))"
+        };
+    }
 }
 
 record GeneratorOptions(
@@ -803,5 +902,7 @@ record ShellPropertyInfo(
     string Name,
     string TypeName,
     bool IsRequired,
-    string Description
+    string Description,
+    bool IsEnum = false,
+    ImmutableArray<string> EnumValues = default
 );

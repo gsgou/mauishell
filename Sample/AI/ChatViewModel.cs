@@ -165,11 +165,16 @@ public partial class ChatViewModel(
 
             {AiExtensions.AiRoutePrompt}
             When the user describes a problem, request, or intent that matches a route, call NavigateToRoute immediately with the appropriate route and parameters inferred from what the user said. Do not ask the user to confirm parameters unless something is genuinely ambiguous.
+
+            When the user first greets you or asks what you can do, briefly describe your capabilities based on the available routes above.
             """));
 
+        // Build a welcome message describing what the bot can do based on available routes
+        var routes = navigator.GetAiToolApplicableGeneratedRoutes();
+        var capabilities = string.Join("\n", routes.Select(r => $"- {r.Description}"));
         Messages.Add(new ChatMessage
         {
-            Text = "Yes master, how may I serve thee?",
+            Text = $"Hi! I'm your AI assistant. Here's what I can help with:\n{capabilities}\n\nJust describe what you need and I'll take care of the rest!",
             IsFromMe = false,
             SenderId = "copilot"
         });
@@ -195,6 +200,9 @@ public partial class ChatViewModel(
             cts = new CancellationTokenSource();
 
             var tools = navigator.GetAiTools();
+            Debug.WriteLine("[AI] Registered tools:");
+            foreach (var tool in tools)
+                Debug.WriteLine($"  - {tool}");
 
             var options = new ChatOptions { Tools = [.. tools] };
 

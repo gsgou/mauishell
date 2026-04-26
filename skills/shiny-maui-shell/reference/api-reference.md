@@ -489,6 +489,11 @@ public static class AiExtensions
     public static string AiRoutePrompt { get; }
 
     // AI-friendly navigation using switch dispatch to NavigateTo<TViewModel>
+    // String values are automatically converted to the target property type:
+    // string (direct), int/long/short/byte/float/double/decimal (T.Parse),
+    // bool (bool.Parse), enums (Enum.Parse case-insensitive),
+    // Guid/DateTime/DateTimeOffset/TimeSpan (T.Parse), Uri (new Uri),
+    // other types (Convert.ChangeType fallback)
     [Description("Navigate to a route in the application, passing parameters as key-value pairs. Returns a confirmation message.")]
     public static Task<string> NavigateToRoute(
         this INavigator navigator,
