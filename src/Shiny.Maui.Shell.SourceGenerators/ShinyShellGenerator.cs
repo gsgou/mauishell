@@ -113,9 +113,8 @@ public class ShinyShellGenerator : IIncrementalGenerator
                         return literal.Token.ValueText;
                     }
                 }
-                // If it's the first positional argument and not a named argument for registerRoute
-                else if (arg == attribute.ArgumentList.Arguments[0] && 
-                         arg.NameColon?.Name.Identifier.ValueText != "registerRoute")
+                // If it's the first positional argument (no named colon)
+                else if (arg == attribute.ArgumentList.Arguments[0] && arg.NameColon == null)
                 {
                     if (arg.Expression is LiteralExpressionSyntax literal &&
                         literal.Token.IsKind(SyntaxKind.StringLiteralToken))
@@ -198,17 +197,19 @@ public class ShinyShellGenerator : IIncrementalGenerator
                 }
             }
 
-            // Positional: description is 3rd param on ShellMapAttribute, 1st on ShellPropertyAttribute
-            // For ShellMapAttribute positional, we check the 3rd arg if it's a string
-            for (int i = 0; i < attribute.ArgumentList.Arguments.Count; i++)
+            // Positional: description is 3rd param (index 2) on ShellMapAttribute(route, registerRoute, description)
+            int positionalIndex = 0;
+            foreach (var arg in attribute.ArgumentList.Arguments)
             {
-                var arg = attribute.ArgumentList.Arguments[i];
                 if (arg.NameColon != null)
                     continue;
 
-                if (arg.Expression is LiteralExpressionSyntax literal &&
+                if (positionalIndex == 2 &&
+                    arg.Expression is LiteralExpressionSyntax literal &&
                     literal.Token.IsKind(SyntaxKind.StringLiteralToken))
                     return literal.Token.ValueText;
+
+                positionalIndex++;
             }
         }
         return null;
@@ -356,6 +357,7 @@ public class ShinyShellGenerator : IIncrementalGenerator
             GenerateNavigationBuilderExtensions(context, filtered);
             GenerateNavigationExtensions(context, filtered);
             GenerateNavigationBuilderNavExtensions(context, filtered);
+            GenerateRouteInfoExtension(context, filtered);
         }
         else
         {
@@ -562,6 +564,45 @@ public class ShinyShellGenerator : IIncrementalGenerator
 
         sb.AppendLine("}");
         context.AddSource("NavigationBuilderNavExtensions.g.cs", sb.ToString());
+    }
+
+    static void GenerateRouteInfoExtension(SourceProductionContext context, ImmutableArray<ShellMapInfo> classes)
+    {
+        var sb = new StringBuilder();
+        sb.AppendLine("#nullable enable");
+        sb.AppendLine("public static class GeneratedRouteInfoExtensions");
+        sb.AppendLine("{");
+        sb.AppendLine("    [global::System.ComponentModel.Description(\"This provides a list of routes throughout the application\")]");
+        sb.AppendLine("    public static global::Shiny.Infrastructure.GeneratedRouteInfo[] GetGeneratedRouteInfo(this global::Shiny.INavigator navigator) =>");
+        sb.AppendLine("    [");
+
+        for (int i = 0; i < classes.Length; i++)
+        {
+            var cls = classes[i];
+            var propsWithDesc = cls.Properties.Where(p => p.Description != null).ToList();
+            var descriptionArg = cls.Description != null
+                ? $"\"{EscapeString(cls.Description)}\""
+                : "\"\"";
+
+            sb.Append($"        new global::Shiny.Infrastructure.GeneratedRouteInfo(\"{EscapeString(cls.Route)}\", {descriptionArg}, [");
+
+            if (propsWithDesc.Any())
+            {
+                var paramEntries = propsWithDesc.Select(p =>
+                    $"new global::Shiny.Infrastructure.GeneratedRouteParameter(\"{EscapeString(p.Name)}\", \"{EscapeString(p.Description)}\")");
+                sb.Append(string.Join(", ", paramEntries));
+            }
+
+            sb.Append("])");
+            if (i < classes.Length - 1)
+                sb.Append(",");
+            sb.AppendLine();
+        }
+
+        sb.AppendLine("    ];");
+        sb.AppendLine("}");
+
+        context.AddSource("GeneratedRouteInfoExtensions.g.cs", sb.ToString());
     }
 
     static string ToCamelCase(string text)

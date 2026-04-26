@@ -50,6 +50,12 @@ namespace Shiny
     }
 }
 
+namespace Shiny.Infrastructure
+{
+    public record GeneratedRouteInfo(string Route, string Description, GeneratedRouteParameter[] Parameters);
+    public record GeneratedRouteParameter(string ParameterName, string Description);
+}
+
 namespace Microsoft.Maui.Controls
 {
     public class Page { }
@@ -564,6 +570,349 @@ namespace TestApp
 
         builderNavSource.ShouldContain("AddDashboard");
         builderNavSource.ShouldNotContain("AddHome");
+    }
+
+    #endregion
+
+    #region Description Attributes
+
+    [Fact]
+    public void NavExtensions_WithDescription_GeneratesXmlDocAndDescriptionAttribute()
+    {
+        var source = StubTypes + @"
+namespace TestApp
+{
+    public class DetailPage : Microsoft.Maui.Controls.Page { }
+
+    [ShellMap<DetailPage>(description: ""Navigate to the detail page"")]
+    public class DetailViewModel : System.ComponentModel.INotifyPropertyChanged
+    {
+        public event System.ComponentModel.PropertyChangedEventHandler? PropertyChanged;
+
+        [ShellProperty(""The item text"", true)]
+        public string Text { get; set; }
+    }
+}";
+        var result = RunGenerator(source);
+        var navSource = GetGeneratedSource(result, "NavigationExtensions.g.cs");
+
+        navSource.ShouldContain("/// <summary>");
+        navSource.ShouldContain("/// Navigate to the detail page");
+        navSource.ShouldContain("/// </summary>");
+        navSource.ShouldContain("/// <param name=\"text\">The item text</param>");
+        navSource.ShouldContain("/// <param name=\"relativeNavigation\">");
+        navSource.ShouldContain("[global::System.ComponentModel.Description(\"Navigate to the detail page\")]");
+        navSource.ShouldContain("[global::System.ComponentModel.Description(\"The item text\")] string text");
+    }
+
+    [Fact]
+    public void NavExtensions_WithoutDescription_NoXmlDocOrDescriptionAttribute()
+    {
+        var source = StubTypes + @"
+namespace TestApp
+{
+    public class HomePage : Microsoft.Maui.Controls.Page { }
+
+    [ShellMap<HomePage>]
+    public class HomeViewModel : System.ComponentModel.INotifyPropertyChanged
+    {
+        public event System.ComponentModel.PropertyChangedEventHandler? PropertyChanged;
+    }
+}";
+        var result = RunGenerator(source);
+        var navSource = GetGeneratedSource(result, "NavigationExtensions.g.cs");
+
+        navSource.ShouldNotContain("/// <summary>");
+        navSource.ShouldNotContain("[global::System.ComponentModel.Description");
+    }
+
+    [Fact]
+    public void NavExtensions_PropertyWithoutDescription_NoDescriptionAttributeOnParam()
+    {
+        var source = StubTypes + @"
+namespace TestApp
+{
+    public class DetailPage : Microsoft.Maui.Controls.Page { }
+
+    [ShellMap<DetailPage>(description: ""A detail page"")]
+    public class DetailViewModel : System.ComponentModel.INotifyPropertyChanged
+    {
+        public event System.ComponentModel.PropertyChangedEventHandler? PropertyChanged;
+
+        [ShellProperty(required: true)]
+        public string Text { get; set; }
+    }
+}";
+        var result = RunGenerator(source);
+        var navSource = GetGeneratedSource(result, "NavigationExtensions.g.cs");
+
+        navSource.ShouldContain("[global::System.ComponentModel.Description(\"A detail page\")]");
+        navSource.ShouldContain("/// <param name=\"text\"></param>");
+        navSource.ShouldNotContain("[global::System.ComponentModel.Description(\"\")] string text");
+        // The param should NOT have a Description attribute since no description was provided
+        navSource.ShouldContain(", string text,");
+    }
+
+    [Fact]
+    public void NavExtensions_RelativeNavigationParam_GetsDescriptionWhenMethodHasDescription()
+    {
+        var source = StubTypes + @"
+namespace TestApp
+{
+    public class DetailPage : Microsoft.Maui.Controls.Page { }
+
+    [ShellMap<DetailPage>(description: ""Go to detail"")]
+    public class DetailViewModel : System.ComponentModel.INotifyPropertyChanged
+    {
+        public event System.ComponentModel.PropertyChangedEventHandler? PropertyChanged;
+    }
+}";
+        var result = RunGenerator(source);
+        var navSource = GetGeneratedSource(result, "NavigationExtensions.g.cs");
+
+        navSource.ShouldContain("[global::System.ComponentModel.Description(\"If true, it will navigate/stack from where the application currently is otherwise, it will reset the stack to this new route\")] bool relativeNavigation = true");
+    }
+
+    #endregion
+
+    #region GeneratedRouteInfo Extension
+
+    [Fact]
+    public void RouteInfo_GeneratesExtensionMethod()
+    {
+        var source = StubTypes + @"
+namespace TestApp
+{
+    public class HomePage : Microsoft.Maui.Controls.Page { }
+
+    [ShellMap<HomePage>]
+    public class HomeViewModel : System.ComponentModel.INotifyPropertyChanged
+    {
+        public event System.ComponentModel.PropertyChangedEventHandler? PropertyChanged;
+    }
+}";
+        var result = RunGenerator(source);
+        var routeInfoSource = GetGeneratedSource(result, "GeneratedRouteInfoExtensions.g.cs");
+
+        routeInfoSource.ShouldContain("GetGeneratedRouteInfo");
+        routeInfoSource.ShouldContain("this global::Shiny.INavigator navigator");
+        routeInfoSource.ShouldContain("[global::System.ComponentModel.Description(\"This provides a list of routes throughout the application\")]");
+    }
+
+    [Fact]
+    public void RouteInfo_WithDescriptions_IncludesParameters()
+    {
+        var source = StubTypes + @"
+namespace TestApp
+{
+    public class DetailPage : Microsoft.Maui.Controls.Page { }
+
+    [ShellMap<DetailPage>(description: ""Navigate to detail"")]
+    public class DetailViewModel : System.ComponentModel.INotifyPropertyChanged
+    {
+        public event System.ComponentModel.PropertyChangedEventHandler? PropertyChanged;
+
+        [ShellProperty(""Show this text"", true)]
+        public string Text { get; set; }
+
+        [ShellProperty(""Show this text2"", true)]
+        public string Text2 { get; set; }
+    }
+}";
+        var result = RunGenerator(source);
+        var routeInfoSource = GetGeneratedSource(result, "GeneratedRouteInfoExtensions.g.cs");
+
+        routeInfoSource.ShouldContain("new global::Shiny.Infrastructure.GeneratedRouteInfo(\"DetailPage\", \"Navigate to detail\"");
+        routeInfoSource.ShouldContain("new global::Shiny.Infrastructure.GeneratedRouteParameter(\"Text\", \"Show this text\")");
+        routeInfoSource.ShouldContain("new global::Shiny.Infrastructure.GeneratedRouteParameter(\"Text2\", \"Show this text2\")");
+    }
+
+    [Fact]
+    public void RouteInfo_WithoutPropertyDescriptions_EmptyParameterArray()
+    {
+        var source = StubTypes + @"
+namespace TestApp
+{
+    public class DetailPage : Microsoft.Maui.Controls.Page { }
+
+    [ShellMap<DetailPage>]
+    public class DetailViewModel : System.ComponentModel.INotifyPropertyChanged
+    {
+        public event System.ComponentModel.PropertyChangedEventHandler? PropertyChanged;
+
+        [ShellProperty(required: true)]
+        public string Text { get; set; }
+    }
+}";
+        var result = RunGenerator(source);
+        var routeInfoSource = GetGeneratedSource(result, "GeneratedRouteInfoExtensions.g.cs");
+
+        routeInfoSource.ShouldContain("new global::Shiny.Infrastructure.GeneratedRouteInfo(\"DetailPage\", \"\", [])");
+    }
+
+    [Fact]
+    public void RouteInfo_MultipleRoutes_GeneratesAll()
+    {
+        var source = StubTypes + @"
+namespace TestApp
+{
+    public class HomePage : Microsoft.Maui.Controls.Page { }
+    public class DetailPage : Microsoft.Maui.Controls.Page { }
+
+    [ShellMap<HomePage>]
+    public class HomeViewModel : System.ComponentModel.INotifyPropertyChanged
+    {
+        public event System.ComponentModel.PropertyChangedEventHandler? PropertyChanged;
+    }
+
+    [ShellMap<DetailPage>(description: ""Detail"")]
+    public class DetailViewModel : System.ComponentModel.INotifyPropertyChanged
+    {
+        public event System.ComponentModel.PropertyChangedEventHandler? PropertyChanged;
+
+        [ShellProperty(""The ID"")]
+        public int Id { get; set; }
+    }
+}";
+        var result = RunGenerator(source);
+        var routeInfoSource = GetGeneratedSource(result, "GeneratedRouteInfoExtensions.g.cs");
+
+        routeInfoSource.ShouldContain("new global::Shiny.Infrastructure.GeneratedRouteInfo(\"HomePage\", \"\"");
+        routeInfoSource.ShouldContain("new global::Shiny.Infrastructure.GeneratedRouteInfo(\"DetailPage\", \"Detail\"");
+        routeInfoSource.ShouldContain("new global::Shiny.Infrastructure.GeneratedRouteParameter(\"Id\", \"The ID\")");
+    }
+
+    [Fact]
+    public void RouteInfo_NoDescription_EmptyDescriptionString()
+    {
+        var source = StubTypes + @"
+namespace TestApp
+{
+    public class HomePage : Microsoft.Maui.Controls.Page { }
+
+    [ShellMap<HomePage>]
+    public class HomeViewModel : System.ComponentModel.INotifyPropertyChanged
+    {
+        public event System.ComponentModel.PropertyChangedEventHandler? PropertyChanged;
+    }
+}";
+        var result = RunGenerator(source);
+        var routeInfoSource = GetGeneratedSource(result, "GeneratedRouteInfoExtensions.g.cs");
+
+        routeInfoSource.ShouldContain("new global::Shiny.Infrastructure.GeneratedRouteInfo(\"HomePage\", \"\", [])");
+    }
+
+    [Fact]
+    public void RouteInfo_WithDescription_IncludesDescriptionInConstructor()
+    {
+        var source = StubTypes + @"
+namespace TestApp
+{
+    public class DetailPage : Microsoft.Maui.Controls.Page { }
+
+    [ShellMap<DetailPage>(description: ""This is detail"")]
+    public class DetailViewModel : System.ComponentModel.INotifyPropertyChanged
+    {
+        public event System.ComponentModel.PropertyChangedEventHandler? PropertyChanged;
+    }
+}";
+        var result = RunGenerator(source);
+        var routeInfoSource = GetGeneratedSource(result, "GeneratedRouteInfoExtensions.g.cs");
+
+        routeInfoSource.ShouldContain("new global::Shiny.Infrastructure.GeneratedRouteInfo(\"DetailPage\", \"This is detail\", [])");
+    }
+
+    [Fact]
+    public void RouteInfo_MethodHasDescriptionAttribute()
+    {
+        var source = StubTypes + @"
+namespace TestApp
+{
+    public class HomePage : Microsoft.Maui.Controls.Page { }
+
+    [ShellMap<HomePage>]
+    public class HomeViewModel : System.ComponentModel.INotifyPropertyChanged
+    {
+        public event System.ComponentModel.PropertyChangedEventHandler? PropertyChanged;
+    }
+}";
+        var result = RunGenerator(source);
+        var routeInfoSource = GetGeneratedSource(result, "GeneratedRouteInfoExtensions.g.cs");
+
+        routeInfoSource.ShouldContain("[global::System.ComponentModel.Description(\"This provides a list of routes throughout the application\")]");
+    }
+
+    [Fact]
+    public void RouteInfo_UsesFullyQualifiedTypes()
+    {
+        var source = StubTypes + @"
+namespace TestApp
+{
+    public class DetailPage : Microsoft.Maui.Controls.Page { }
+
+    [ShellMap<DetailPage>(description: ""A page"")]
+    public class DetailViewModel : System.ComponentModel.INotifyPropertyChanged
+    {
+        public event System.ComponentModel.PropertyChangedEventHandler? PropertyChanged;
+
+        [ShellProperty(""An id"")]
+        public int Id { get; set; }
+    }
+}";
+        var result = RunGenerator(source);
+        var routeInfoSource = GetGeneratedSource(result, "GeneratedRouteInfoExtensions.g.cs");
+
+        routeInfoSource.ShouldContain("global::Shiny.Infrastructure.GeneratedRouteInfo[]");
+        routeInfoSource.ShouldContain("global::Shiny.INavigator");
+        routeInfoSource.ShouldContain("new global::Shiny.Infrastructure.GeneratedRouteInfo(");
+        routeInfoSource.ShouldContain("new global::Shiny.Infrastructure.GeneratedRouteParameter(");
+        routeInfoSource.ShouldContain("global::System.ComponentModel.Description");
+    }
+
+    [Fact]
+    public void RouteInfo_MixedDescriptions_OnlyPropsWithDescriptionIncluded()
+    {
+        var source = StubTypes + @"
+namespace TestApp
+{
+    public class DetailPage : Microsoft.Maui.Controls.Page { }
+
+    [ShellMap<DetailPage>(description: ""Detail"")]
+    public class DetailViewModel : System.ComponentModel.INotifyPropertyChanged
+    {
+        public event System.ComponentModel.PropertyChangedEventHandler? PropertyChanged;
+
+        [ShellProperty(""Has description"")]
+        public string Name { get; set; }
+
+        [ShellProperty(required: true)]
+        public int Id { get; set; }
+    }
+}";
+        var result = RunGenerator(source);
+        var routeInfoSource = GetGeneratedSource(result, "GeneratedRouteInfoExtensions.g.cs");
+
+        routeInfoSource.ShouldContain("new global::Shiny.Infrastructure.GeneratedRouteParameter(\"Name\", \"Has description\")");
+        routeInfoSource.ShouldNotContain("\"Id\"");
+    }
+
+    [Fact]
+    public void RouteInfo_DisabledViaProperty_NotGenerated()
+    {
+        var source = StubTypes + @"
+namespace TestApp
+{
+    public class HomePage : Microsoft.Maui.Controls.Page { }
+
+    [ShellMap<HomePage>]
+    public class HomeViewModel : System.ComponentModel.INotifyPropertyChanged
+    {
+        public event System.ComponentModel.PropertyChangedEventHandler? PropertyChanged;
+    }
+}";
+        var result = RunGenerator(source, ("ShinyMauiShell_GenerateNavExtensions", "false"));
+
+        GetGeneratedSourceOrDefault(result, "GeneratedRouteInfoExtensions.g.cs").ShouldBeNull();
     }
 
     #endregion

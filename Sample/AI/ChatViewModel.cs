@@ -4,7 +4,7 @@ using Shiny;
 namespace Sample.AI;
 
 [ShellMap<ChatPage>]
-public partial class ChatViewModel : ObservableObject, IPageLifecycleAware
+public partial class ChatViewModel(INavigator navigator) : ObservableObject, IPageLifecycleAware
 {
     public void OnAppearing()
     {
@@ -17,14 +17,12 @@ public partial class ChatViewModel : ObservableObject, IPageLifecycleAware
         
         string GetCurrentWeather() => Random.Shared.NextDouble() > 0.5 ? "It's sunny" : "It's raining";
 
+        
         //AITool
         ChatOptions options = new() { Tools = [
-            AIFunctionFactory.Create(
-                GetCurrentWeather,
-                "name",
-                "description",
-                null // json serializer options
-            )
+            AIFunctionFactory.Create(navigator.GetGeneratedRouteInfo),
+            AIFunctionFactory.Create(navigator.NavigateTo),
+            AIFunctionFactory.Create(navigator.NavigateToDetail)
         ]};
     }
 

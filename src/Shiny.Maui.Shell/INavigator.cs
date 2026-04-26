@@ -14,6 +14,7 @@ public interface INavigator
 
     /// <summary>
     /// Navigates to the specified route and passes the provided arguments to the target page or view model.
+    /// Use this method with AI tooling along with the extension GetGeneratedRouteInfo
     /// </summary>
     /// <remarks>To receive the arguments passed via <paramref name="args"/>, the target page or view model
     /// must implement the <see cref="IQueryAttributable"/> interface.</remarks>
@@ -22,7 +23,17 @@ public interface INavigator
     /// <param name="args">A collection of key-value pairs representing the arguments to pass to the target page or view model. Each key
     /// must be unique.</param>
     /// <returns>A task that represents the asynchronous navigation operation.</returns>
-    Task NavigateTo(string route, bool relativeNavigation = true, params IEnumerable<(string Key, object Value)> args);
+    [Description("Navigate to a route in the application")]
+    Task NavigateTo(
+        [Description("The route name")]
+        string route, 
+        
+        [Description("Navigate from the current page if true, otherwise - reset the navigation stack")]
+        bool relativeNavigation = true, 
+        
+        [Description("Route parameters - name and value")]
+        params IEnumerable<(string Key, object Value)> args
+    );
 
 
     /// <summary>
