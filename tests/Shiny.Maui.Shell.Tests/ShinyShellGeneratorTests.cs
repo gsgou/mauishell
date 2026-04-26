@@ -19,13 +19,13 @@ namespace Shiny
     [AttributeUsage(AttributeTargets.Class, AllowMultiple = false)]
     public sealed class ShellMapAttribute<TPage> : Attribute
     {
-        public ShellMapAttribute(string route = null, bool registerRoute = true) { }
+        public ShellMapAttribute(string route = null, bool registerRoute = true, string description = null) { }
     }
 
     [AttributeUsage(AttributeTargets.Property, AllowMultiple = false)]
     public sealed class ShellPropertyAttribute : Attribute
     {
-        public ShellPropertyAttribute(bool required = true) { }
+        public ShellPropertyAttribute(string description = null, bool required = true) { }
     }
 
     public interface INavigationBuilder
@@ -508,7 +508,7 @@ namespace TestApp
     {
         public event System.ComponentModel.PropertyChangedEventHandler? PropertyChanged;
 
-        [ShellProperty(true)]
+        [ShellProperty(required: true)]
         public int Id { get; set; }
 
         [ShellProperty]

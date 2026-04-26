@@ -1,16 +1,18 @@
+using System.ComponentModel;
 using Microsoft.Extensions.Logging;
 using Shiny;
 
 namespace Sample;
 
 [ShellMap<DetailPage>]
+[global::System.ComponentModel.Description("This is a test generation")]
 public partial class DetailViewModel(
     ILogger<DetailViewModel> logger,
     INavigator navigator,
     IDialogs dialogs
 ) : ObservableObject, IQueryAttributable, IPageLifecycleAware, INavigationConfirmation, INavigationAware, IDisposable
 {
-    [ShellProperty(true)]
+    [ShellProperty("This is required Text to render", required: true)]
     public string Text { get; set; } = string.Empty;
 
     [ObservableProperty] string source = "unknown";

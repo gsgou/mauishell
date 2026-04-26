@@ -9,10 +9,10 @@ public partial class ModalDemoViewModel(
     INavigator navigator
 ) : ObservableObject, IPageLifecycleAware, INavigationAware, IDisposable
 {
-    [ShellProperty(true)]
+    [ShellProperty(required: true)]
     public string Title { get; set; } = "Modal Page";
 
-    [ShellProperty(false)]
+    [ShellProperty(required: false)]
     public string OptionalNote { get; set; } = "(none)";
 
     [RelayCommand]

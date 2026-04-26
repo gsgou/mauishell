@@ -73,8 +73,9 @@ public class ShinyShellGenerator : IIncrementalGenerator
                         var pageType = attributeClass.TypeArguments[0];
                         var route = GetRouteFromAttribute(attribute);
                         var registerRoute = GetRegisterRouteFromAttribute(attribute);
+                        var description = GetDescriptionFromAttribute(attribute);
                         var properties = GetShellProperties(classDeclaration, context.SemanticModel);
-                        
+
                         var viewModelSymbol = context.SemanticModel.GetDeclaredSymbol(classDeclaration);
                         var generatedName = route ?? pageType.Name.Replace("Page", "");
                         return new ShellMapInfo(
@@ -85,6 +86,7 @@ public class ShinyShellGenerator : IIncrementalGenerator
                             route ?? pageType.Name,
                             generatedName,
                             registerRoute,
+                            description,
                             properties,
                             attribute.GetLocation()
                         );
@@ -181,6 +183,62 @@ public class ShinyShellGenerator : IIncrementalGenerator
         return true;
     }
 
+    static string GetDescriptionFromAttribute(AttributeSyntax attribute)
+    {
+        if (attribute.ArgumentList?.Arguments.Count > 0)
+        {
+            foreach (var arg in attribute.ArgumentList.Arguments)
+            {
+                if (arg.NameColon?.Name.Identifier.ValueText == "description")
+                {
+                    if (arg.Expression is LiteralExpressionSyntax literal &&
+                        literal.Token.IsKind(SyntaxKind.StringLiteralToken))
+                        return literal.Token.ValueText;
+                    return null;
+                }
+            }
+
+            // Positional: description is 3rd param on ShellMapAttribute, 1st on ShellPropertyAttribute
+            // For ShellMapAttribute positional, we check the 3rd arg if it's a string
+            for (int i = 0; i < attribute.ArgumentList.Arguments.Count; i++)
+            {
+                var arg = attribute.ArgumentList.Arguments[i];
+                if (arg.NameColon != null)
+                    continue;
+
+                if (arg.Expression is LiteralExpressionSyntax literal &&
+                    literal.Token.IsKind(SyntaxKind.StringLiteralToken))
+                    return literal.Token.ValueText;
+            }
+        }
+        return null;
+    }
+
+    static string GetPropertyDescriptionFromAttribute(AttributeSyntax attribute)
+    {
+        if (attribute.ArgumentList?.Arguments.Count > 0)
+        {
+            foreach (var arg in attribute.ArgumentList.Arguments)
+            {
+                if (arg.NameColon?.Name.Identifier.ValueText == "description")
+                {
+                    if (arg.Expression is LiteralExpressionSyntax literal &&
+                        literal.Token.IsKind(SyntaxKind.StringLiteralToken))
+                        return literal.Token.ValueText;
+                    return null;
+                }
+            }
+
+            // Positional: description is 1st param on ShellPropertyAttribute
+            var firstArg = attribute.ArgumentList.Arguments[0];
+            if (firstArg.NameColon == null &&
+                firstArg.Expression is LiteralExpressionSyntax firstLiteral &&
+                firstLiteral.Token.IsKind(SyntaxKind.StringLiteralToken))
+                return firstLiteral.Token.ValueText;
+        }
+        return null;
+    }
+
     static ImmutableArray<ShellPropertyInfo> GetShellProperties(ClassDeclarationSyntax classDeclaration, SemanticModel semanticModel)
     {
         var properties = ImmutableArray.CreateBuilder<ShellPropertyInfo>();
@@ -196,14 +254,15 @@ public class ShinyShellGenerator : IIncrementalGenerator
                         attributeSymbol.ContainingType.Name == "ShellPropertyAttribute")
                     {
                         var isRequired = GetIsRequiredFromAttribute(attribute);
+                        var propDescription = GetPropertyDescriptionFromAttribute(attribute);
                         var propertySymbol = semanticModel.GetDeclaredSymbol(member) as IPropertySymbol;
-                        
+
                         if (propertySymbol != null)
                         {
                             // Check if property has public get/set
                             var hasPublicGetter = propertySymbol.GetMethod?.DeclaredAccessibility == Accessibility.Public;
                             var hasPublicSetter = propertySymbol.SetMethod?.DeclaredAccessibility == Accessibility.Public;
-                            
+
                             if (!hasPublicGetter || !hasPublicSetter)
                             {
                                 // This would ideally be a diagnostic error, but for now we'll skip
@@ -214,7 +273,8 @@ public class ShinyShellGenerator : IIncrementalGenerator
                                 properties.Add(new ShellPropertyInfo(
                                     member.Identifier.ValueText,
                                     propertySymbol.Type.ToDisplayString(),
-                                    isRequired
+                                    isRequired,
+                                    propDescription
                                 ));
                             }
                         }
@@ -230,14 +290,37 @@ public class ShinyShellGenerator : IIncrementalGenerator
     {
         if (attribute.ArgumentList?.Arguments.Count > 0)
         {
-            var firstArg = attribute.ArgumentList.Arguments[0];
-            if (firstArg.Expression is LiteralExpressionSyntax literal &&
-                literal.Token.IsKind(SyntaxKind.TrueKeyword))
+            // Check named argument first
+            foreach (var arg in attribute.ArgumentList.Arguments)
             {
-                return true;
+                if (arg.NameColon?.Name.Identifier.ValueText == "required")
+                {
+                    if (arg.Expression is LiteralExpressionSyntax literal)
+                    {
+                        if (literal.Token.IsKind(SyntaxKind.TrueKeyword))
+                            return true;
+                        if (literal.Token.IsKind(SyntaxKind.FalseKeyword))
+                            return false;
+                    }
+                }
+            }
+
+            // Positional: required is 2nd param (index 1) on ShellPropertyAttribute
+            for (int i = 0; i < attribute.ArgumentList.Arguments.Count; i++)
+            {
+                var arg = attribute.ArgumentList.Arguments[i];
+                if (arg.NameColon != null)
+                    continue;
+
+                if (arg.Expression is LiteralExpressionSyntax literal &&
+                    (literal.Token.IsKind(SyntaxKind.TrueKeyword) || literal.Token.IsKind(SyntaxKind.FalseKeyword)))
+                {
+                    return literal.Token.IsKind(SyntaxKind.TrueKeyword);
+                }
             }
         }
-        return false;
+        // Default value is true according to the attribute definition
+        return true;
     }
 
     static void GenerateCode(SourceProductionContext context, ImmutableArray<ShellMapInfo?> classes, (bool GenerateRouteConstants, bool GenerateNavExtensions) options)
@@ -319,23 +402,52 @@ public class ShinyShellGenerator : IIncrementalGenerator
             var methodName = $"NavigateTo{cls.GeneratedName}";
             var requiredParams = cls.Properties.Where(p => p.IsRequired).ToList();
             var optionalParams = cls.Properties.Where(p => !p.IsRequired).ToList();
-            
+
+            // XML doc comment
+            if (cls.Description != null)
+            {
+                sb.AppendLine($"    /// <summary>");
+                sb.AppendLine($"    /// {EscapeXml(cls.Description)}");
+                sb.AppendLine($"    /// </summary>");
+
+                foreach (var prop in requiredParams.Concat(optionalParams))
+                {
+                    var paramDesc = prop.Description != null ? EscapeXml(prop.Description) : "";
+                    sb.AppendLine($"    /// <param name=\"{ToCamelCase(prop.Name)}\">{paramDesc}</param>");
+                }
+
+                sb.AppendLine($"    /// <param name=\"relativeNavigation\">If true, it will navigate/stack from where the application currently is otherwise, it will reset the stack to this new route</param>");
+            }
+
+            // [Description] on method
+            if (cls.Description != null)
+                sb.AppendLine($"    [global::System.ComponentModel.Description(\"{EscapeString(cls.Description)}\")]");
+
             sb.Append($"    public static global::System.Threading.Tasks.Task {methodName}(this global::Shiny.INavigator navigator");
 
             // Add required parameters first
             foreach (var prop in requiredParams)
             {
-                sb.Append($", {prop.TypeName} {ToCamelCase(prop.Name)}");
+                if (prop.Description != null)
+                    sb.Append($", [global::System.ComponentModel.Description(\"{EscapeString(prop.Description)}\")] {prop.TypeName} {ToCamelCase(prop.Name)}");
+                else
+                    sb.Append($", {prop.TypeName} {ToCamelCase(prop.Name)}");
             }
 
             // Add optional parameters last
             foreach (var prop in optionalParams)
             {
                 var defaultValue = GetDefaultValue(prop.TypeName);
-                sb.Append($", {prop.TypeName} {ToCamelCase(prop.Name)} = {defaultValue}");
+                if (prop.Description != null)
+                    sb.Append($", [global::System.ComponentModel.Description(\"{EscapeString(prop.Description)}\")] {prop.TypeName} {ToCamelCase(prop.Name)} = {defaultValue}");
+                else
+                    sb.Append($", {prop.TypeName} {ToCamelCase(prop.Name)} = {defaultValue}");
             }
 
-            sb.Append(", bool relativeNavigation = true");
+            if (cls.Description != null)
+                sb.Append(", [global::System.ComponentModel.Description(\"If true, it will navigate/stack from where the application currently is otherwise, it will reset the stack to this new route\")] bool relativeNavigation = true");
+            else
+                sb.Append(", bool relativeNavigation = true");
 
             // If no properties, add the params argument
             if (!cls.Properties.Any())
@@ -361,7 +473,7 @@ public class ShinyShellGenerator : IIncrementalGenerator
             {
                 sb.AppendLine($"        return navigator.NavigateTo<{cls.ViewModelFullName}>(configure: null, relativeNavigation: relativeNavigation, args: args);");
             }
-            
+
             sb.AppendLine("    }");
             sb.AppendLine();
         }
@@ -459,6 +571,21 @@ public class ShinyShellGenerator : IIncrementalGenerator
         return char.ToLower(text[0]) + text.Substring(1);
     }
 
+    static string EscapeXml(string text)
+    {
+        return text
+            .Replace("&", "&amp;")
+            .Replace("<", "&lt;")
+            .Replace(">", "&gt;");
+    }
+
+    static string EscapeString(string text)
+    {
+        return text
+            .Replace("\\", "\\\\")
+            .Replace("\"", "\\\"");
+    }
+
     static string GetDefaultValue(string typeName)
     {
         return typeName.EndsWith("?") || typeName == "string" ? "null" : "default";
@@ -473,6 +600,7 @@ record ShellMapInfo(
     string Route,
     string GeneratedName,
     bool RegisterRoute,
+    string Description,
     ImmutableArray<ShellPropertyInfo> Properties,
     Location? AttributeLocation
 );
@@ -480,5 +608,6 @@ record ShellMapInfo(
 record ShellPropertyInfo(
     string Name,
     string TypeName,
-    bool IsRequired
+    bool IsRequired,
+    string Description
 );
