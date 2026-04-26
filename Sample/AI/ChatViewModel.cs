@@ -1,6 +1,7 @@
 using System.ClientModel;
 using System.ClientModel.Primitives;
 using System.Collections.ObjectModel;
+using System.Diagnostics;
 using Microsoft.Extensions.AI;
 using OpenAI;
 using Shiny;
@@ -21,11 +22,26 @@ public partial class ChatViewModel(
     CancellationTokenSource? cts;
     readonly List<AIChatMessage> history = [];
 
+    static readonly ChatParticipant aiParticipant = new()
+    {
+        Id = "copilot",
+        DisplayName = "AI"
+    };
+
     public ObservableCollection<ChatMessage> Messages { get; } = [];
+    public ObservableCollection<ChatParticipant> TypingParticipants { get; } = [];
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsNotBusy))]
     bool isBusy;
+
+    partial void OnIsBusyChanged(bool value)
+    {
+        if (value)
+            TypingParticipants.Add(aiParticipant);
+        else
+            TypingParticipants.Remove(aiParticipant);
+    }
 
     [ObservableProperty]
     string authStatus = "Not authenticated";
@@ -38,7 +54,36 @@ public partial class ChatViewModel(
 
     public bool IsNotBusy => !IsBusy;
 
-    public void OnAppearing() { }
+    public async void OnAppearing()
+    {
+        if (IsAuthenticated || IsBusy)
+            return;
+
+        IsBusy = true;
+        AuthStatus = "Restoring session...";
+
+        try
+        {
+            if (await authService.TryRestoreSessionAsync())
+            {
+                SetupChatClient();
+                IsAuthenticated = true;
+                AuthStatus = "Ready to chat";
+            }
+            else
+            {
+                AuthStatus = "Not authenticated";
+            }
+        }
+        catch
+        {
+            AuthStatus = "Not authenticated";
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
     public void OnDisappearing() => cts?.Cancel();
 
     [RelayCommand]
@@ -113,7 +158,14 @@ public partial class ChatViewModel(
             .Build();
 
         history.Clear();
-        history.Add(new AIChatMessage(ChatRole.System, "You are a helpful assistant integrated in a .NET MAUI app. You can help navigate the app using the provided tools."));
+        Debug.WriteLine($"[AI] AiRoutePrompt:\n{AiExtensions.AiRoutePrompt}");
+        history.Add(new AIChatMessage(ChatRole.System,
+            $"""
+            You are a helpful assistant integrated in a .NET MAUI app. You can navigate the user to pages and pre-fill forms using the NavigateToRoute tool.
+
+            {AiExtensions.AiRoutePrompt}
+            When the user describes a problem, request, or intent that matches a route, call NavigateToRoute immediately with the appropriate route and parameters inferred from what the user said. Do not ask the user to confirm parameters unless something is genuinely ambiguous.
+            """));
 
         Messages.Add(new ChatMessage
         {
@@ -142,17 +194,38 @@ public partial class ChatViewModel(
             IsBusy = true;
             cts = new CancellationTokenSource();
 
-            var options = new ChatOptions
-            {
-                Tools =
-                [
-                    AIFunctionFactory.Create(navigator.GetAiToolApplicableGeneratedRoutes),
-                    AIFunctionFactory.Create(navigator.NavigateToRoute)
-                ]
-            };
+            var tools = navigator.GetAiTools();
+
+            var options = new ChatOptions { Tools = [.. tools] };
 
             var response = await chatClient.GetResponseAsync(history, options, cts.Token);
+
+            Debug.WriteLine($"[AI] Response messages: {response.Messages.Count}");
+            foreach (var msg in response.Messages)
+            {
+                Debug.WriteLine($"[AI]   Role={msg.Role}, Contents={msg.Contents.Count}");
+                foreach (var content in msg.Contents)
+                {
+                    switch (content)
+                    {
+                        case TextContent tc:
+                            Debug.WriteLine($"[AI]     TextContent: {tc.Text?[..Math.Min(200, tc.Text?.Length ?? 0)]}");
+                            break;
+                        case FunctionCallContent fc:
+                            Debug.WriteLine($"[AI]     FunctionCall: {fc.Name}({System.Text.Json.JsonSerializer.Serialize(fc.Arguments)})");
+                            break;
+                        case FunctionResultContent fr:
+                            Debug.WriteLine($"[AI]     FunctionResult: CallId={fr.CallId}, Result={fr.Result}");
+                            break;
+                        default:
+                            Debug.WriteLine($"[AI]     {content.GetType().Name}: {content}");
+                            break;
+                    }
+                }
+            }
+
             var assistantText = response.Text ?? "(no response)";
+            Debug.WriteLine($"[AI] Final text: {assistantText}");
 
             history.Add(new AIChatMessage(ChatRole.Assistant, assistantText));
             Messages.Add(new ChatMessage
@@ -165,6 +238,7 @@ public partial class ChatViewModel(
         catch (OperationCanceledException) { }
         catch (Exception ex)
         {
+            Debug.WriteLine($"[AI] ERROR: {ex}");
             Messages.Add(new ChatMessage
             {
                 Text = $"Error: {ex.Message}",

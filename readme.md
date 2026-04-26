@@ -66,7 +66,7 @@ Inspired by [Prism Library](https://prismlibrary.com) by Dan Siegel and Brian La
 | `NavigationExtensions.g.cs` | Typed methods — `NavigateToDetail(id, page)` with XML docs and `[Description]` attributes |
 | `NavigationBuilderNavExtensions.g.cs` | Typed builder methods — `AddDetail(id, page)` |
 | `NavigationBuilderExtensions.g.cs` | One-line DI — `AddGeneratedMaps()` |
-| `GeneratedRouteInfoExtensions.g.cs` | Route metadata — `GetGeneratedRouteInfo()`, `GetAiToolApplicableGeneratedRoutes()`, and `NavigateToRoute()` for AI/tooling integration |
+| `AiExtensions.g.cs` | Route metadata — `GetGeneratedRouteInfo()`, plus AI extensions (`GetAiToolApplicableGeneratedRoutes()`, `NavigateToRoute()`, `GetAiTools()`, `AiRoutePrompt`) when opted in |
 
 > Invalid route names produce **SHINY001** compiler errors. Disable individual outputs via MSBuild properties.
 
@@ -455,8 +455,8 @@ public static class NavigationBuilderExtensions
     }
 }
 
-// GeneratedRouteInfoExtensions.g.cs — route metadata for AI/tooling
-public static class GeneratedRouteInfoExtensions
+// AiExtensions.g.cs — route metadata (always generated)
+public static class AiExtensions
 {
     [Description("This provides a list of routes throughout the application")]
     public static GeneratedRouteInfo[] GetGeneratedRouteInfo(this INavigator navigator) =>
@@ -466,23 +466,23 @@ public static class GeneratedRouteInfoExtensions
              new("Page", "Page number for pagination", "int", false)])
     ];
 
-    [Description("This provides a list of AI tool applicable routes - routes that have descriptions and parameters that an AI can populate from user intent")]
-    public static GeneratedRouteInfo[] GetAiToolApplicableGeneratedRoutes(this INavigator navigator) =>
-    [
-        new("Detail", "Navigate to the detail page",
-            [new("ItemId", "The item identifier", "string", true),
-             new("Page", "Page number for pagination", "int", false)])
-    ];
+    // --- AI extensions below only generated when ShinyMauiShell_GenerateAiExtensions=true ---
 
-    [Description("Navigate to a route in the application, passing parameters as key-value pairs")]
-    public static Task NavigateToRoute(this INavigator navigator,
-        [Description("The route name to navigate to")] string route,
-        [Description("Route parameters as key-value pairs")] Dictionary<string, string>? args = null,
-        [Description("Navigate from the current page if true, otherwise reset the navigation stack")] bool relativeNavigation = true)
+    public static GeneratedRouteInfo[] GetAiToolApplicableGeneratedRoutes(this INavigator navigator) => ...;
+
+    public static string AiRoutePrompt { get; } = "Available routes:\n- Route \"Detail\": ...";
+
+    public static async Task<string> NavigateToRoute(this INavigator navigator,
+        string route, Dictionary<string, string>? args = null)
     {
-        var tuples = args?.Select(kvp => (kvp.Key, (object)kvp.Value)) ?? [];
-        return navigator.NavigateTo(route, relativeNavigation, tuples);
+        // Switch-dispatches to NavigateTo<TViewModel> with direct property setters
     }
+
+    public static IList<AITool> GetAiTools(this INavigator navigator) =>
+    [
+        AIFunctionFactory.Create(() => navigator.GetAiToolApplicableGeneratedRoutes(), ...),
+        AIFunctionFactory.Create((string route, Dictionary<string, string>? args) => navigator.NavigateToRoute(route, args), ...)
+    ];
 }
 ```
 
@@ -497,14 +497,13 @@ await navigator.NavigateToDetail("123", page: 2);
 // Fluent builder with generated extensions
 await navigator.CreateBuilder().AddDetail("123", page: 2).Navigate();
 
-// Get route metadata for AI tooling
+// Get route metadata for tooling
 var routes = navigator.GetGeneratedRouteInfo();
 
-// Get only AI-applicable routes (have descriptions + parameters)
+// AI integration (requires ShinyMauiShell_GenerateAiExtensions=true and Microsoft.Extensions.AI)
 var aiRoutes = navigator.GetAiToolApplicableGeneratedRoutes();
-
-// AI-friendly navigation with Dictionary<string, string> instead of tuples
-await navigator.NavigateToRoute("Detail", new() { ["ItemId"] = "123", ["Page"] = "2" });
+var tools = navigator.GetAiTools(); // Ready-to-use AITool instances
+var options = new ChatOptions { Tools = [.. tools] };
 ```
 
 ### Route Naming
@@ -535,10 +534,10 @@ Disable individual generated files via MSBuild properties:
     <!-- Disable NavigationExtensions.g.cs, NavigationBuilderNavExtensions.g.cs, and NavigationBuilderExtensions.g.cs (AddGeneratedMaps) -->
     <ShinyMauiShell_GenerateNavExtensions>false</ShinyMauiShell_GenerateNavExtensions>
 
-    <!-- Disable AI extensions (GetAiToolApplicableGeneratedRoutes, NavigateToRoute) -->
-    <ShinyMauiShell_GenerateAiExtensions>false</ShinyMauiShell_GenerateAiExtensions>
+    <!-- Enable AI extensions (disabled by default, requires Microsoft.Extensions.AI) -->
+    <ShinyMauiShell_GenerateAiExtensions>true</ShinyMauiShell_GenerateAiExtensions>
 
-    <!-- Customize the generated class name (default: GeneratedRouteInfoExtensions) -->
+    <!-- Customize the generated class name (default: AiExtensions) -->
     <ShinyMauiShell_AiExtensionsClassName>MyAppRouteExtensions</ShinyMauiShell_AiExtensionsClassName>
 
     <!-- Customize the AI navigate method name (default: NavigateToRoute) -->
@@ -550,8 +549,8 @@ Disable individual generated files via MSBuild properties:
 |---|---|---|
 | `ShinyMauiShell_GenerateRouteConstants` | `true` | `Routes.g.cs` |
 | `ShinyMauiShell_GenerateNavExtensions` | `true` | All navigation extensions and `AddGeneratedMaps` |
-| `ShinyMauiShell_GenerateAiExtensions` | `true` | `GetAiToolApplicableGeneratedRoutes` and `NavigateToRoute` methods |
-| `ShinyMauiShell_AiExtensionsClassName` | `GeneratedRouteInfoExtensions` | Class name for the route info/AI extensions class |
+| `ShinyMauiShell_GenerateAiExtensions` | `false` | `GetAiToolApplicableGeneratedRoutes`, `NavigateToRoute`, `GetAiTools()`, and `AiRoutePrompt`. Requires `Microsoft.Extensions.AI` package (**SHINY003** error if missing) |
+| `ShinyMauiShell_AiExtensionsClassName` | `AiExtensions` | Class name for the route info/AI extensions class |
 | `ShinyMauiShell_AiNavigateMethodName` | `NavigateToRoute` | Method name for the AI-friendly navigate method |
 
 `NavigationBuilderExtensions.g.cs` (`AddGeneratedMaps()`) is only generated when `[ShellMap]` attributes are detected and `ShinyMauiShell_GenerateNavExtensions` is not set to `false`. A **SHINY002** warning is emitted if maps are detected but nav extensions are disabled.
@@ -578,41 +577,29 @@ public partial class WorkOrderViewModel : ObservableObject, IQueryAttributable
 }
 ```
 
-2. **Route metadata is generated** — The source generator produces `GeneratedRouteInfo` records with full parameter details (name, description, CLR type, required/optional):
+2. **Enable AI generation** — Add to your `.csproj` and install `Microsoft.Extensions.AI`:
 
-```csharp
-// All routes
-var routes = navigator.GetGeneratedRouteInfo();
-
-// Only routes with descriptions AND parameters (ready for AI)
-var aiRoutes = navigator.GetAiToolApplicableGeneratedRoutes();
+```xml
+<PropertyGroup>
+    <ShinyMauiShell_GenerateAiExtensions>true</ShinyMauiShell_GenerateAiExtensions>
+</PropertyGroup>
 ```
 
-`GetAiToolApplicableGeneratedRoutes()` filters out routes that lack a description or have no parameters — returning only routes an AI can meaningfully act on.
-
-3. **AI-friendly navigation** — `NavigateToRoute()` accepts `Dictionary<string, string>` instead of tuples, which AI models handle naturally in tool schemas:
+3. **Use generated AI tools** — The source generator produces ready-to-use `AITool` instances:
 
 ```csharp
-await navigator.NavigateToRoute("WorkOrderPage",
-    new() { ["Description"] = "Furnace not working", ["Priority"] = "Urgent" });
-```
-
-4. **Register two tools** — Wire it up with `Microsoft.Extensions.AI`:
-
-```csharp
-var options = new ChatOptions
-{
-    Tools =
-    [
-        AIFunctionFactory.Create(navigator.GetAiToolApplicableGeneratedRoutes),
-        AIFunctionFactory.Create(navigator.NavigateToRoute)
-    ]
-};
-
+var tools = navigator.GetAiTools();
+var options = new ChatOptions { Tools = [.. tools] };
 var response = await chatClient.GetResponseAsync(history, options);
 ```
 
-The AI calls `GetAiToolApplicableGeneratedRoutes` to discover what pages exist and what they do, then calls `NavigateToRoute` with the appropriate route and parameters extracted from the user's message.
+The AI calls `GetAiToolApplicableGeneratedRoutes` to discover what pages exist and what they do, then calls `NavigateToRoute` with the appropriate route and parameters extracted from the user's message. `NavigateToRoute` dispatches to `NavigateTo<TViewModel>` with direct property setters — no string-based Shell navigation involved.
+
+You can also seed the AI with route info upfront via the generated `AiRoutePrompt`:
+
+```csharp
+history.Add(new ChatMessage(ChatRole.System, AiExtensions.AiRoutePrompt));
+```
 
 ### GeneratedRouteParameter
 
@@ -633,7 +620,7 @@ The flow:
 1. User taps **Login with GitHub** — the app requests a device code and opens `github.com/login/device` in the browser
 2. User enters the displayed code to authorize
 3. The app exchanges the GitHub token for a Copilot API token and creates an `IChatClient` via `Microsoft.Extensions.AI.OpenAI` (the Copilot API is OpenAI-compatible)
-4. The chat uses `GetAiToolApplicableGeneratedRoutes` + `NavigateToRoute` as AI tools
+4. The chat uses `navigator.GetAiTools()` which provides ready-to-use `AITool` instances for route discovery and navigation
 
 The relevant sample files:
 - `Sample/AI/ChatPage.xaml` — Chat UI using `Shiny.Maui.Controls.ChatView`

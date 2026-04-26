@@ -27,7 +27,7 @@
             <shiny:ChatView
                 Messages="{Binding Messages}"
                 SendCommand="{Binding SendCommand}"
-                ShowTypingIndicator="{Binding IsBusy}"
+                TypingParticipants="{Binding TypingParticipants}"
                 PlaceholderText="Ask the AI anything..."
                 SendButtonText="Send"
                 MyBubbleColor="#DCF8C6"

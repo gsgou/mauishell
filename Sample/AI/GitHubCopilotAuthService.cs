@@ -9,6 +9,7 @@ public class GitHubCopilotAuthService
     const string DeviceCodeUrl = "https://github.com/login/device/code";
     const string AccessTokenUrl = "https://github.com/login/oauth/access_token";
     const string CopilotTokenUrl = "https://api.github.com/copilot_internal/v2/token";
+    const string SecureStorageKey = "github_copilot_access_token";
 
     readonly HttpClient httpClient = new();
 
@@ -17,6 +18,28 @@ public class GitHubCopilotAuthService
     DateTimeOffset copilotTokenExpiry;
 
     public bool IsAuthenticated => gitHubAccessToken != null;
+
+    public async Task<bool> TryRestoreSessionAsync()
+    {
+        var stored = await SecureStorage.Default.GetAsync(SecureStorageKey);
+        if (string.IsNullOrEmpty(stored))
+            return false;
+
+        gitHubAccessToken = stored;
+
+        try
+        {
+            await GetCopilotTokenAsync();
+            return true;
+        }
+        catch
+        {
+            // Token is invalid/revoked — clear it
+            gitHubAccessToken = null;
+            SecureStorage.Default.Remove(SecureStorageKey);
+            return false;
+        }
+    }
 
     public async Task<DeviceCodeResponse> RequestDeviceCodeAsync(CancellationToken ct = default)
     {
@@ -58,6 +81,7 @@ public class GitHubCopilotAuthService
             if (result?.AccessToken != null)
             {
                 gitHubAccessToken = result.AccessToken;
+                await SecureStorage.Default.SetAsync(SecureStorageKey, gitHubAccessToken);
                 return true;
             }
 
@@ -98,6 +122,7 @@ public class GitHubCopilotAuthService
     {
         gitHubAccessToken = null;
         copilotToken = null;
+        SecureStorage.Default.Remove(SecureStorageKey);
     }
 }
 

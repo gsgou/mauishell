@@ -61,6 +61,15 @@ namespace Microsoft.Maui.Controls
 {
     public class Page { }
 }
+
+namespace Microsoft.Extensions.AI
+{
+    public class AITool { }
+    public static class AIFunctionFactory
+    {
+        public static AITool Create(Delegate func, string name = null, string description = null) => new AITool();
+    }
+}
 ";
 
     #region Route Constant Generation
@@ -693,7 +702,7 @@ namespace TestApp
     }
 }";
         var result = RunGenerator(source);
-        var routeInfoSource = GetGeneratedSource(result, "GeneratedRouteInfoExtensions.g.cs");
+        var routeInfoSource = GetGeneratedSource(result, "AiExtensions.g.cs");
 
         routeInfoSource.ShouldContain("GetGeneratedRouteInfo");
         routeInfoSource.ShouldContain("this global::Shiny.INavigator navigator");
@@ -721,7 +730,7 @@ namespace TestApp
     }
 }";
         var result = RunGenerator(source);
-        var routeInfoSource = GetGeneratedSource(result, "GeneratedRouteInfoExtensions.g.cs");
+        var routeInfoSource = GetGeneratedSource(result, "AiExtensions.g.cs");
 
         routeInfoSource.ShouldContain("new global::Shiny.Infrastructure.GeneratedRouteInfo(\"DetailPage\", \"Navigate to detail\"");
         routeInfoSource.ShouldContain("new global::Shiny.Infrastructure.GeneratedRouteParameter(\"Text\", \"Show this text\", \"string\", true)");
@@ -746,7 +755,7 @@ namespace TestApp
     }
 }";
         var result = RunGenerator(source);
-        var routeInfoSource = GetGeneratedSource(result, "GeneratedRouteInfoExtensions.g.cs");
+        var routeInfoSource = GetGeneratedSource(result, "AiExtensions.g.cs");
 
         routeInfoSource.ShouldContain("new global::Shiny.Infrastructure.GeneratedRouteParameter(\"Text\", \"\", \"string\", true)");
     }
@@ -776,7 +785,7 @@ namespace TestApp
     }
 }";
         var result = RunGenerator(source);
-        var routeInfoSource = GetGeneratedSource(result, "GeneratedRouteInfoExtensions.g.cs");
+        var routeInfoSource = GetGeneratedSource(result, "AiExtensions.g.cs");
 
         routeInfoSource.ShouldContain("new global::Shiny.Infrastructure.GeneratedRouteInfo(\"HomePage\", \"\"");
         routeInfoSource.ShouldContain("new global::Shiny.Infrastructure.GeneratedRouteInfo(\"DetailPage\", \"Detail\"");
@@ -798,7 +807,7 @@ namespace TestApp
     }
 }";
         var result = RunGenerator(source);
-        var routeInfoSource = GetGeneratedSource(result, "GeneratedRouteInfoExtensions.g.cs");
+        var routeInfoSource = GetGeneratedSource(result, "AiExtensions.g.cs");
 
         routeInfoSource.ShouldContain("new global::Shiny.Infrastructure.GeneratedRouteInfo(\"HomePage\", \"\", [])");
     }
@@ -818,7 +827,7 @@ namespace TestApp
     }
 }";
         var result = RunGenerator(source);
-        var routeInfoSource = GetGeneratedSource(result, "GeneratedRouteInfoExtensions.g.cs");
+        var routeInfoSource = GetGeneratedSource(result, "AiExtensions.g.cs");
 
         routeInfoSource.ShouldContain("new global::Shiny.Infrastructure.GeneratedRouteInfo(\"DetailPage\", \"This is detail\", [])");
     }
@@ -838,7 +847,7 @@ namespace TestApp
     }
 }";
         var result = RunGenerator(source);
-        var routeInfoSource = GetGeneratedSource(result, "GeneratedRouteInfoExtensions.g.cs");
+        var routeInfoSource = GetGeneratedSource(result, "AiExtensions.g.cs");
 
         routeInfoSource.ShouldContain("[global::System.ComponentModel.Description(\"This provides a list of routes throughout the application\")]");
     }
@@ -861,7 +870,7 @@ namespace TestApp
     }
 }";
         var result = RunGenerator(source);
-        var routeInfoSource = GetGeneratedSource(result, "GeneratedRouteInfoExtensions.g.cs");
+        var routeInfoSource = GetGeneratedSource(result, "AiExtensions.g.cs");
 
         routeInfoSource.ShouldContain("global::Shiny.Infrastructure.GeneratedRouteInfo[]");
         routeInfoSource.ShouldContain("global::Shiny.INavigator");
@@ -891,7 +900,7 @@ namespace TestApp
     }
 }";
         var result = RunGenerator(source);
-        var routeInfoSource = GetGeneratedSource(result, "GeneratedRouteInfoExtensions.g.cs");
+        var routeInfoSource = GetGeneratedSource(result, "AiExtensions.g.cs");
 
         routeInfoSource.ShouldContain("new global::Shiny.Infrastructure.GeneratedRouteParameter(\"Name\", \"Has description\", \"string\", true)");
         routeInfoSource.ShouldContain("new global::Shiny.Infrastructure.GeneratedRouteParameter(\"Id\", \"\", \"int\", true)");
@@ -913,7 +922,7 @@ namespace TestApp
 }";
         var result = RunGenerator(source, ("ShinyMauiShell_GenerateNavExtensions", "false"));
 
-        GetGeneratedSourceOrDefault(result, "GeneratedRouteInfoExtensions.g.cs").ShouldBeNull();
+        GetGeneratedSourceOrDefault(result, "AiExtensions.g.cs").ShouldBeNull();
     }
 
     [Fact]
@@ -934,7 +943,7 @@ namespace TestApp
     }
 }";
         var result = RunGenerator(source, ("ShinyMauiShell_GenerateAiExtensions", "false"));
-        var routeInfoSource = GetGeneratedSource(result, "GeneratedRouteInfoExtensions.g.cs");
+        var routeInfoSource = GetGeneratedSource(result, "AiExtensions.g.cs");
 
         routeInfoSource.ShouldContain("GetGeneratedRouteInfo");
         routeInfoSource.ShouldNotContain("GetAiToolApplicableGeneratedRoutes");
@@ -958,11 +967,13 @@ namespace TestApp
         public string Description { get; set; }
     }
 }";
-        var result = RunGenerator(source, ("ShinyMauiShell_AiExtensionsClassName", "MyAppRouteExtensions"));
-        var routeInfoSource = GetGeneratedSource(result, "GeneratedRouteInfoExtensions.g.cs");
+        var result = RunGenerator(source,
+            ("ShinyMauiShell_GenerateAiExtensions", "true"),
+            ("ShinyMauiShell_AiExtensionsClassName", "MyAppRouteExtensions"));
+        var routeInfoSource = GetGeneratedSource(result, "AiExtensions.g.cs");
 
         routeInfoSource.ShouldContain("public static class MyAppRouteExtensions");
-        routeInfoSource.ShouldNotContain("public static class GeneratedRouteInfoExtensions");
+        routeInfoSource.ShouldNotContain("public static class AiExtensions");
     }
 
     [Fact]
@@ -982,15 +993,17 @@ namespace TestApp
         public string Description { get; set; }
     }
 }";
-        var result = RunGenerator(source, ("ShinyMauiShell_AiNavigateMethodName", "GoToPage"));
-        var routeInfoSource = GetGeneratedSource(result, "GeneratedRouteInfoExtensions.g.cs");
+        var result = RunGenerator(source,
+            ("ShinyMauiShell_GenerateAiExtensions", "true"),
+            ("ShinyMauiShell_AiNavigateMethodName", "GoToPage"));
+        var routeInfoSource = GetGeneratedSource(result, "AiExtensions.g.cs");
 
         routeInfoSource.ShouldContain("GoToPage(");
         routeInfoSource.ShouldNotContain("NavigateToRoute(");
     }
 
     [Fact]
-    public void AiExtensions_DefaultValues_UsesStandardNames()
+    public void AiExtensions_DisabledByDefault()
     {
         var source = StubTypes + @"
 namespace TestApp
@@ -1007,11 +1020,96 @@ namespace TestApp
     }
 }";
         var result = RunGenerator(source);
-        var routeInfoSource = GetGeneratedSource(result, "GeneratedRouteInfoExtensions.g.cs");
+        var routeInfoSource = GetGeneratedSource(result, "AiExtensions.g.cs");
 
-        routeInfoSource.ShouldContain("public static class GeneratedRouteInfoExtensions");
+        routeInfoSource.ShouldContain("public static class AiExtensions");
+        routeInfoSource.ShouldContain("GetGeneratedRouteInfo");
+        routeInfoSource.ShouldNotContain("GetAiToolApplicableGeneratedRoutes");
+        routeInfoSource.ShouldNotContain("NavigateToRoute");
+        routeInfoSource.ShouldNotContain("AiRoutePrompt");
+        routeInfoSource.ShouldNotContain("GetAiTools");
+    }
+
+    [Fact]
+    public void AiExtensions_Enabled_GeneratesAllAiMethods()
+    {
+        var source = StubTypes + @"
+namespace TestApp
+{
+    public class WorkOrderPage : Microsoft.Maui.Controls.Page { }
+
+    [ShellMap<WorkOrderPage>(description: ""Report something broken"")]
+    public class WorkOrderViewModel : System.ComponentModel.INotifyPropertyChanged
+    {
+        public event System.ComponentModel.PropertyChangedEventHandler? PropertyChanged;
+
+        [ShellProperty(""Summarize what is broken"")]
+        public string Description { get; set; }
+    }
+}";
+        var result = RunGenerator(source, ("ShinyMauiShell_GenerateAiExtensions", "true"));
+        var routeInfoSource = GetGeneratedSource(result, "AiExtensions.g.cs");
+
         routeInfoSource.ShouldContain("GetAiToolApplicableGeneratedRoutes");
         routeInfoSource.ShouldContain("NavigateToRoute(");
+        routeInfoSource.ShouldContain("AiRoutePrompt");
+        routeInfoSource.ShouldContain("GetAiTools");
+        routeInfoSource.ShouldContain("Microsoft.Extensions.AI.AITool");
+        routeInfoSource.ShouldContain("Microsoft.Extensions.AI.AIFunctionFactory");
+    }
+
+    [Fact]
+    public void AiExtensions_AiRoutePrompt_ContainsRouteAndParameterInfo()
+    {
+        var source = StubTypes + @"
+namespace TestApp
+{
+    public class WorkOrderPage : Microsoft.Maui.Controls.Page { }
+
+    [ShellMap<WorkOrderPage>(description: ""Report something broken"")]
+    public class WorkOrderViewModel : System.ComponentModel.INotifyPropertyChanged
+    {
+        public event System.ComponentModel.PropertyChangedEventHandler? PropertyChanged;
+
+        [ShellProperty(""Summarize what is broken"", required: true)]
+        public string Description { get; set; }
+
+        [ShellProperty(""The location"", required: false)]
+        public string Location { get; set; }
+    }
+}";
+        var result = RunGenerator(source, ("ShinyMauiShell_GenerateAiExtensions", "true"));
+        var routeInfoSource = GetGeneratedSource(result, "AiExtensions.g.cs");
+
+        routeInfoSource.ShouldContain("AiRoutePrompt");
+        routeInfoSource.ShouldContain("WorkOrderPage");
+        routeInfoSource.ShouldContain("Report something broken");
+        routeInfoSource.ShouldContain("Description (string, required): Summarize what is broken");
+        routeInfoSource.ShouldContain("Location (string, optional): The location");
+    }
+
+    [Fact]
+    public void AiExtensions_ExplicitlyDisabled_NoAiMethods()
+    {
+        var source = StubTypes + @"
+namespace TestApp
+{
+    public class WorkOrderPage : Microsoft.Maui.Controls.Page { }
+
+    [ShellMap<WorkOrderPage>(description: ""Report something broken"")]
+    public class WorkOrderViewModel : System.ComponentModel.INotifyPropertyChanged
+    {
+        public event System.ComponentModel.PropertyChangedEventHandler? PropertyChanged;
+
+        [ShellProperty(""Summarize what is broken"")]
+        public string Description { get; set; }
+    }
+}";
+        var result = RunGenerator(source, ("ShinyMauiShell_GenerateAiExtensions", "false"));
+        var routeInfoSource = GetGeneratedSource(result, "AiExtensions.g.cs");
+
+        routeInfoSource.ShouldNotContain("AiRoutePrompt");
+        routeInfoSource.ShouldNotContain("GetAiTools");
     }
 
     #endregion
