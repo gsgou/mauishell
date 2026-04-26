@@ -23,15 +23,9 @@ public interface INavigator
     /// <param name="args">A collection of key-value pairs representing the arguments to pass to the target page or view model. Each key
     /// must be unique.</param>
     /// <returns>A task that represents the asynchronous navigation operation.</returns>
-    [Description("Navigate to a route in the application")]
     Task NavigateTo(
-        [Description("The route name")]
-        string route, 
-        
-        [Description("Navigate from the current page if true, otherwise - reset the navigation stack")]
-        bool relativeNavigation = true, 
-        
-        [Description("Route parameters - name and value")]
+        string route,
+        bool relativeNavigation = true,
         params IEnumerable<(string Key, object Value)> args
     );
 

@@ -5,6 +5,7 @@
     </PropertyGroup>
     <ItemGroup>
         <PackageVersion Include="Microsoft.Extensions.AI" Version="10.5.0"/>
+        <PackageVersion Include="Microsoft.Extensions.AI.OpenAI" Version="10.5.0"/>
         <PackageVersion Include="Nerdbank.GitVersioning" Version="3.9.50"/>
         <PackageVersion Include="Microsoft.Maui.Controls" Version="$(MauiVersion)"/>
         <PackageVersion Include="Microsoft.CodeAnalysis.CSharp" Version="4.8.0"/>

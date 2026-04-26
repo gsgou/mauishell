@@ -7,7 +7,7 @@ namespace Shiny.Infrastructure;
 /// <param name="Description">The description of the route from ShellMapAttribute</param>
 /// <param name="Parameters">Parameters that are marked with ShellPropertyAttribute</param>
 public record GeneratedRouteInfo(
-    string Route, 
+    string Route,
     string Description,
     GeneratedRouteParameter[] Parameters
 );
@@ -17,4 +17,11 @@ public record GeneratedRouteInfo(
 /// </summary>
 /// <param name="ParameterName">Property name</param>
 /// <param name="Description">The description/documentation of the property</param>
-public record GeneratedRouteParameter(string ParameterName, string Description);
+/// <param name="TypeName">The CLR type name of the parameter (e.g. string, int, bool)</param>
+/// <param name="IsRequired">Whether this parameter is required for navigation</param>
+public record GeneratedRouteParameter(
+    string ParameterName,
+    string Description,
+    string TypeName,
+    bool IsRequired
+);

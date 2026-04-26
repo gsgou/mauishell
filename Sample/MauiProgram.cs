@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using Sample.AI;
 using Shiny;
 
 namespace Sample;
@@ -20,6 +21,7 @@ public static class MauiProgram
                 fonts.AddFont("OpenSans-Semibold.ttf", "OpenSansSemibold");
             });
 
+        builder.Services.AddSingleton<GitHubCopilotAuthService>();
         builder.Services.AddSingleton<IMauiInitializeService, NavigationLogger>();
 
 #if DEBUG

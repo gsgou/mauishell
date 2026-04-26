@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:ai="clr-namespace:Sample.AI"
+             x:Class="Sample.AI.TestWorkOrderPage"
+             x:DataType="ai:TestWorkOrderViewModel"
+             Title="Work Order">
+    <ScrollView>
+        <VerticalStackLayout Padding="20" Spacing="12">
+
+            <Label Text="Work Order" FontAttributes="Bold" FontSize="22" />
+
+            <Label Text="Description" FontAttributes="Bold" />
+            <Editor Text="{Binding Description}" HeightRequest="120" />
+
+            <Label Text="Priority" FontAttributes="Bold" />
+            <Picker SelectedItem="{Binding Priority}">
+                <Picker.ItemsSource>
+                    <x:Array Type="{x:Type x:String}">
+                        <x:String>Low</x:String>
+                        <x:String>Medium</x:String>
+                        <x:String>High</x:String>
+                        <x:String>Urgent</x:String>
+                    </x:Array>
+                </Picker.ItemsSource>
+            </Picker>
+
+            <Label Text="Location" FontAttributes="Bold" />
+            <Entry Text="{Binding Location}" Placeholder="e.g. Building A, Room 101" />
+
+            <Label Text="Requested By" FontAttributes="Bold" />
+            <Entry Text="{Binding RequestedBy}" Placeholder="Your name" />
+
+            <BoxView HeightRequest="1" Color="LightGray" Margin="0,8" />
+
+            <Button Text="Submit Work Order" Command="{Binding SubmitCommand}" />
+            <Label Text="Work order submitted!" TextColor="Green" FontAttributes="Bold"
+                   IsVisible="{Binding IsSubmitted}" />
+
+            <Button Text="Go Back" Command="{Binding GoBackCommand}" />
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>

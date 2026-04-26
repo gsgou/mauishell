@@ -63,11 +63,18 @@ Inspired by [Prism Library](https://prismlibrary.com) by Dan Siegel and Brian La
 | Generated File | What It Does |
 |:----------------|:------------|
 | `Routes.g.cs` | Static route constants — `Routes.Detail` |
-| `NavigationExtensions.g.cs` | Typed methods — `NavigateToDetail(id, page)` |
+| `NavigationExtensions.g.cs` | Typed methods — `NavigateToDetail(id, page)` with XML docs and `[Description]` attributes |
 | `NavigationBuilderNavExtensions.g.cs` | Typed builder methods — `AddDetail(id, page)` |
 | `NavigationBuilderExtensions.g.cs` | One-line DI — `AddGeneratedMaps()` |
+| `GeneratedRouteInfoExtensions.g.cs` | Route metadata — `GetGeneratedRouteInfo()`, `GetAiToolApplicableGeneratedRoutes()`, and `NavigateToRoute()` for AI/tooling integration |
 
 > Invalid route names produce **SHINY001** compiler errors. Disable individual outputs via MSBuild properties.
+
+### 🔌 Custom Handlers
+
+| Handler | Description |
+|:--------|:------------|
+| `DisableShellFlyoutSwipeHandler` | Disables the flyout swipe gesture while keeping the hamburger button functional. Opt-in via `DisableShellFlyoutSwipeHandler.Register()` |
 
 ### ✅ Zero Ceremony
 
@@ -347,14 +354,14 @@ builder.Services.AddSingleton<IMauiInitializeService, NavigationLogger>();
 Implement these interfaces on your ViewModels as needed. Works just like [Prism Library](https://prismlibrary.com).
 
 ```csharp
-[ShellMap<DetailPage>("Detail")]
+[ShellMap<DetailPage>("Detail", description: "Navigate to the detail page")]
 public partial class DetailViewModel(INavigator navigator, IDialogs dialogs) : ObservableObject,
     IQueryAttributable,
     IPageLifecycleAware,
     INavigationConfirmation,
     IDisposable
 {
-    [ShellProperty]
+    [ShellProperty("The item identifier")]
     [ObservableProperty]
     string itemId;
 
@@ -385,13 +392,13 @@ Decorate your ViewModels with `[ShellMap]` and `[ShellProperty]` to eliminate bo
 
 **Input:**
 ```csharp
-[ShellMap<DetailPage>("Detail")]
+[ShellMap<DetailPage>("Detail", description: "Navigate to the detail page")]
 public partial class DetailViewModel : ObservableObject
 {
-    [ShellProperty]
+    [ShellProperty("The item identifier")]
     public string ItemId { get; set; }
 
-    [ShellProperty(required: false)]
+    [ShellProperty("Page number for pagination", required: false)]
     public int Page { get; set; }
 }
 ```
@@ -405,11 +412,20 @@ public static class Routes
     public const string Detail = "Detail";
 }
 
-// NavigationExtensions.g.cs — typed INavigator methods
+// NavigationExtensions.g.cs — typed INavigator methods with XML docs and [Description] attributes
 public static class NavigationExtensions
 {
-    public static Task NavigateToDetail(this INavigator navigator, string itemId,
-        int page = default, bool relativeNavigation = true)
+    /// <summary>
+    /// Navigate to the detail page
+    /// </summary>
+    /// <param name="itemId">The item identifier</param>
+    /// <param name="page">Page number for pagination</param>
+    /// <param name="relativeNavigation">If true, it will navigate/stack from where the application currently is otherwise, it will reset the stack to this new route</param>
+    [Description("Navigate to the detail page")]
+    public static Task NavigateToDetail(this INavigator navigator,
+        [Description("The item identifier")] string itemId,
+        [Description("Page number for pagination")] int page = default,
+        [Description("If true, it will navigate/stack from where the application currently is otherwise, it will reset the stack to this new route")] bool relativeNavigation = true)
     {
         return navigator.NavigateTo<DetailViewModel>(x =>
         {
@@ -438,6 +454,36 @@ public static class NavigationBuilderExtensions
         return builder;
     }
 }
+
+// GeneratedRouteInfoExtensions.g.cs — route metadata for AI/tooling
+public static class GeneratedRouteInfoExtensions
+{
+    [Description("This provides a list of routes throughout the application")]
+    public static GeneratedRouteInfo[] GetGeneratedRouteInfo(this INavigator navigator) =>
+    [
+        new("Detail", "Navigate to the detail page",
+            [new("ItemId", "The item identifier", "string", true),
+             new("Page", "Page number for pagination", "int", false)])
+    ];
+
+    [Description("This provides a list of AI tool applicable routes - routes that have descriptions and parameters that an AI can populate from user intent")]
+    public static GeneratedRouteInfo[] GetAiToolApplicableGeneratedRoutes(this INavigator navigator) =>
+    [
+        new("Detail", "Navigate to the detail page",
+            [new("ItemId", "The item identifier", "string", true),
+             new("Page", "Page number for pagination", "int", false)])
+    ];
+
+    [Description("Navigate to a route in the application, passing parameters as key-value pairs")]
+    public static Task NavigateToRoute(this INavigator navigator,
+        [Description("The route name to navigate to")] string route,
+        [Description("Route parameters as key-value pairs")] Dictionary<string, string>? args = null,
+        [Description("Navigate from the current page if true, otherwise reset the navigation stack")] bool relativeNavigation = true)
+    {
+        var tuples = args?.Select(kvp => (kvp.Key, (object)kvp.Value)) ?? [];
+        return navigator.NavigateTo(route, relativeNavigation, tuples);
+    }
+}
 ```
 
 Then use it:
@@ -450,6 +496,15 @@ await navigator.NavigateToDetail("123", page: 2);
 
 // Fluent builder with generated extensions
 await navigator.CreateBuilder().AddDetail("123", page: 2).Navigate();
+
+// Get route metadata for AI tooling
+var routes = navigator.GetGeneratedRouteInfo();
+
+// Get only AI-applicable routes (have descriptions + parameters)
+var aiRoutes = navigator.GetAiToolApplicableGeneratedRoutes();
+
+// AI-friendly navigation with Dictionary<string, string> instead of tuples
+await navigator.NavigateToRoute("Detail", new() { ["ItemId"] = "123", ["Page"] = "2" });
 ```
 
 ### Route Naming
@@ -479,7 +534,133 @@ Disable individual generated files via MSBuild properties:
 
     <!-- Disable NavigationExtensions.g.cs, NavigationBuilderNavExtensions.g.cs, and NavigationBuilderExtensions.g.cs (AddGeneratedMaps) -->
     <ShinyMauiShell_GenerateNavExtensions>false</ShinyMauiShell_GenerateNavExtensions>
+
+    <!-- Disable AI extensions (GetAiToolApplicableGeneratedRoutes, NavigateToRoute) -->
+    <ShinyMauiShell_GenerateAiExtensions>false</ShinyMauiShell_GenerateAiExtensions>
+
+    <!-- Customize the generated class name (default: GeneratedRouteInfoExtensions) -->
+    <ShinyMauiShell_AiExtensionsClassName>MyAppRouteExtensions</ShinyMauiShell_AiExtensionsClassName>
+
+    <!-- Customize the AI navigate method name (default: NavigateToRoute) -->
+    <ShinyMauiShell_AiNavigateMethodName>GoToPage</ShinyMauiShell_AiNavigateMethodName>
 </PropertyGroup>
 ```
 
+| Property | Default | Controls |
+|---|---|---|
+| `ShinyMauiShell_GenerateRouteConstants` | `true` | `Routes.g.cs` |
+| `ShinyMauiShell_GenerateNavExtensions` | `true` | All navigation extensions and `AddGeneratedMaps` |
+| `ShinyMauiShell_GenerateAiExtensions` | `true` | `GetAiToolApplicableGeneratedRoutes` and `NavigateToRoute` methods |
+| `ShinyMauiShell_AiExtensionsClassName` | `GeneratedRouteInfoExtensions` | Class name for the route info/AI extensions class |
+| `ShinyMauiShell_AiNavigateMethodName` | `NavigateToRoute` | Method name for the AI-friendly navigate method |
+
 `NavigationBuilderExtensions.g.cs` (`AddGeneratedMaps()`) is only generated when `[ShellMap]` attributes are detected and `ShinyMauiShell_GenerateNavExtensions` is not set to `false`. A **SHINY002** warning is emitted if maps are detected but nav extensions are disabled.
+
+---
+
+## AI Integration
+
+Shiny MAUI Shell's source generation produces metadata and navigation methods designed for AI tool calling via [Microsoft.Extensions.AI](https://www.nuget.org/packages/Microsoft.Extensions.AI). An AI chat client can discover your app's routes, understand their purpose, extract parameters from natural language, and navigate to the correct page — all with just two tools.
+
+### How It Works
+
+1. **Describe your routes** — Add `description` to `[ShellMap]` and `[ShellProperty]` to explain what each page does and what its parameters mean:
+
+```csharp
+[ShellMap<WorkOrderPage>(description: "Use when the user reports something broken, malfunctioning, or needing repair")]
+public partial class WorkOrderViewModel : ObservableObject, IQueryAttributable
+{
+    [ShellProperty("Summarize what is broken based on what the user said", required: true)]
+    public string Description { get; set; } = string.Empty;
+
+    [ShellProperty("Infer urgency from tone. Must be: Low, Medium, High, or Urgent", required: true)]
+    public string Priority { get; set; } = "Medium";
+}
+```
+
+2. **Route metadata is generated** — The source generator produces `GeneratedRouteInfo` records with full parameter details (name, description, CLR type, required/optional):
+
+```csharp
+// All routes
+var routes = navigator.GetGeneratedRouteInfo();
+
+// Only routes with descriptions AND parameters (ready for AI)
+var aiRoutes = navigator.GetAiToolApplicableGeneratedRoutes();
+```
+
+`GetAiToolApplicableGeneratedRoutes()` filters out routes that lack a description or have no parameters — returning only routes an AI can meaningfully act on.
+
+3. **AI-friendly navigation** — `NavigateToRoute()` accepts `Dictionary<string, string>` instead of tuples, which AI models handle naturally in tool schemas:
+
+```csharp
+await navigator.NavigateToRoute("WorkOrderPage",
+    new() { ["Description"] = "Furnace not working", ["Priority"] = "Urgent" });
+```
+
+4. **Register two tools** — Wire it up with `Microsoft.Extensions.AI`:
+
+```csharp
+var options = new ChatOptions
+{
+    Tools =
+    [
+        AIFunctionFactory.Create(navigator.GetAiToolApplicableGeneratedRoutes),
+        AIFunctionFactory.Create(navigator.NavigateToRoute)
+    ]
+};
+
+var response = await chatClient.GetResponseAsync(history, options);
+```
+
+The AI calls `GetAiToolApplicableGeneratedRoutes` to discover what pages exist and what they do, then calls `NavigateToRoute` with the appropriate route and parameters extracted from the user's message.
+
+### GeneratedRouteParameter
+
+Each parameter in the route info includes:
+
+| Field | Description |
+|:------|:------------|
+| `ParameterName` | The property name (used as key in `NavigateToRoute` args) |
+| `Description` | From `[ShellProperty("...")]` — tells the AI what this field means |
+| `TypeName` | CLR type (`string`, `int`, `bool`, etc.) — tells the AI what format to use |
+| `IsRequired` | Whether the AI must provide this value |
+
+### Sample App — GitHub Copilot Authentication
+
+The sample application includes a working AI chat demo that authenticates via **GitHub Copilot** using the OAuth device flow. This lets anyone with a Copilot subscription test AI-driven navigation using their own account — no API keys to configure.
+
+The flow:
+1. User taps **Login with GitHub** — the app requests a device code and opens `github.com/login/device` in the browser
+2. User enters the displayed code to authorize
+3. The app exchanges the GitHub token for a Copilot API token and creates an `IChatClient` via `Microsoft.Extensions.AI.OpenAI` (the Copilot API is OpenAI-compatible)
+4. The chat uses `GetAiToolApplicableGeneratedRoutes` + `NavigateToRoute` as AI tools
+
+The relevant sample files:
+- `Sample/AI/ChatPage.xaml` — Chat UI using `Shiny.Maui.Controls.ChatView`
+- `Sample/AI/ChatViewModel.cs` — AI client setup and tool registration
+- `Sample/AI/GitHubCopilotAuthService.cs` — Device flow OAuth + token management
+- `Sample/AI/TestWorkOrderViewModel.cs` — AI-navigable work order form
+- `Sample/AI/ContactFormViewModel.cs` — AI-navigable contact form
+
+---
+
+## Custom Handlers
+
+Optional handlers that are **not registered by default**. Call `Register()` in your `MauiProgram.cs` to opt in.
+
+### Disable Flyout Swipe
+
+Prevents the Shell flyout from opening via swipe gesture while keeping the hamburger button functional:
+
+```csharp
+using Shiny.Handlers;
+
+// In MauiProgram.cs, before builder.Build()
+DisableShellFlyoutSwipeHandler.Register();
+```
+
+| Platform | Behavior |
+|:---------|:---------|
+| Android | Locks the `DrawerLayout` to `LockModeLockedClosed` |
+| iOS / Mac Catalyst | Disables `UIPanGestureRecognizer` on the Shell view hierarchy |
+| Windows | No-op (Windows Shell has no swipe flyout) |

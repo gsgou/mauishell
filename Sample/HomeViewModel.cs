@@ -20,6 +20,10 @@ public partial class HomeViewModel(INavigator navigator) : ObservableObject
             new("Tab Badges", "Set and clear tab badges", () => navigator.NavigateTo(nameof(BadgeDemoPage))),
             new("Lifecycle", "Page lifecycle and navigation events", () => navigator.NavigateTo(nameof(LifecycleDemoPage))),
         },
+        new("AI")
+        {
+            new("AI Chat", "Chat with AI to navigate and fill forms", () => navigator.NavigateTo(nameof(AI.ChatPage))),
+        },
         new("Advanced")
         {
             new("Shell Switching", "Swap between Shell types at runtime", () => navigator.NavigateTo(nameof(ShellTestPage))),

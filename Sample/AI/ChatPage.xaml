@@ -2,10 +2,45 @@
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:ai="clr-namespace:Sample.AI"
+             xmlns:shiny="clr-namespace:Shiny.Maui.Controls.Chat;assembly=Shiny.Maui.Controls"
              x:Class="Sample.AI.ChatPage"
              x:DataType="ai:ChatViewModel"
              Title="Chat with AI">
-    <ContentPage.Content>
-        
-    </ContentPage.Content>
+    <Grid RowDefinitions="Auto,*">
+
+        <!-- Auth Section -->
+        <VerticalStackLayout Grid.Row="0" Spacing="8" Padding="10"
+                             IsVisible="{Binding IsAuthenticated, Converter={StaticResource InvertedBoolConverter}}">
+            <Label Text="{Binding AuthStatus}" FontSize="14" TextColor="Gray" />
+
+            <HorizontalStackLayout Spacing="10" IsVisible="{Binding UserCode, Converter={StaticResource IsNotNullConverter}}">
+                <Label Text="Code:" FontAttributes="Bold" VerticalOptions="Center" />
+                <Label Text="{Binding UserCode}" FontSize="20" FontAttributes="Bold" TextColor="DodgerBlue" VerticalOptions="Center" />
+            </HorizontalStackLayout>
+
+            <Button Text="Login with GitHub"
+                    Command="{Binding LoginCommand}" />
+        </VerticalStackLayout>
+
+        <!-- Chat -->
+        <Grid Grid.Row="1" IsVisible="{Binding IsAuthenticated}">
+            <shiny:ChatView
+                Messages="{Binding Messages}"
+                SendCommand="{Binding SendCommand}"
+                ShowTypingIndicator="{Binding IsBusy}"
+                PlaceholderText="Ask the AI anything..."
+                SendButtonText="Send"
+                MyBubbleColor="#DCF8C6"
+                OtherBubbleColor="#E8E8E8" />
+
+            <Button Text="Logout"
+                    Command="{Binding LogoutCommand}"
+                    HorizontalOptions="End"
+                    VerticalOptions="Start"
+                    Margin="0,5,10,0"
+                    BackgroundColor="Transparent"
+                    TextColor="Red"
+                    FontSize="12" />
+        </Grid>
+    </Grid>
 </ContentPage>

@@ -44,10 +44,16 @@ public class ShinyShellGenerator : IIncrementalGenerator
             {
                 provider.GlobalOptions.TryGetValue("build_property.ShinyMauiShell_GenerateRouteConstants", out var routeValue);
                 provider.GlobalOptions.TryGetValue("build_property.ShinyMauiShell_GenerateNavExtensions", out var navValue);
+                provider.GlobalOptions.TryGetValue("build_property.ShinyMauiShell_GenerateAiExtensions", out var aiValue);
+                provider.GlobalOptions.TryGetValue("build_property.ShinyMauiShell_AiExtensionsClassName", out var aiClassName);
+                provider.GlobalOptions.TryGetValue("build_property.ShinyMauiShell_AiNavigateMethodName", out var aiNavigateMethodName);
                 // empty or missing is considered true; only explicit "false" disables
-                return (
+                return new GeneratorOptions(
                     GenerateRouteConstants: !string.Equals(routeValue, "false", StringComparison.OrdinalIgnoreCase),
-                    GenerateNavExtensions: !string.Equals(navValue, "false", StringComparison.OrdinalIgnoreCase)
+                    GenerateNavExtensions: !string.Equals(navValue, "false", StringComparison.OrdinalIgnoreCase),
+                    GenerateAiExtensions: !string.Equals(aiValue, "false", StringComparison.OrdinalIgnoreCase),
+                    AiExtensionsClassName: string.IsNullOrWhiteSpace(aiClassName) ? "GeneratedRouteInfoExtensions" : aiClassName!.Trim(),
+                    AiNavigateMethodName: string.IsNullOrWhiteSpace(aiNavigateMethodName) ? "NavigateToRoute" : aiNavigateMethodName!.Trim()
                 );
             });
 
@@ -324,7 +330,7 @@ public class ShinyShellGenerator : IIncrementalGenerator
         return true;
     }
 
-    static void GenerateCode(SourceProductionContext context, ImmutableArray<ShellMapInfo?> classes, (bool GenerateRouteConstants, bool GenerateNavExtensions) options)
+    static void GenerateCode(SourceProductionContext context, ImmutableArray<ShellMapInfo?> classes, GeneratorOptions options)
     {
         var validClasses = classes.Where(c => c != null).Cast<ShellMapInfo>().ToImmutableArray();
 
@@ -357,7 +363,7 @@ public class ShinyShellGenerator : IIncrementalGenerator
             GenerateNavigationBuilderExtensions(context, filtered);
             GenerateNavigationExtensions(context, filtered);
             GenerateNavigationBuilderNavExtensions(context, filtered);
-            GenerateRouteInfoExtension(context, filtered);
+            GenerateRouteInfoExtension(context, filtered, options);
         }
         else
         {
@@ -566,11 +572,11 @@ public class ShinyShellGenerator : IIncrementalGenerator
         context.AddSource("NavigationBuilderNavExtensions.g.cs", sb.ToString());
     }
 
-    static void GenerateRouteInfoExtension(SourceProductionContext context, ImmutableArray<ShellMapInfo> classes)
+    static void GenerateRouteInfoExtension(SourceProductionContext context, ImmutableArray<ShellMapInfo> classes, GeneratorOptions options)
     {
         var sb = new StringBuilder();
         sb.AppendLine("#nullable enable");
-        sb.AppendLine("public static class GeneratedRouteInfoExtensions");
+        sb.AppendLine($"public static class {options.AiExtensionsClassName}");
         sb.AppendLine("{");
         sb.AppendLine("    [global::System.ComponentModel.Description(\"This provides a list of routes throughout the application\")]");
         sb.AppendLine("    public static global::Shiny.Infrastructure.GeneratedRouteInfo[] GetGeneratedRouteInfo(this global::Shiny.INavigator navigator) =>");
@@ -579,17 +585,20 @@ public class ShinyShellGenerator : IIncrementalGenerator
         for (int i = 0; i < classes.Length; i++)
         {
             var cls = classes[i];
-            var propsWithDesc = cls.Properties.Where(p => p.Description != null).ToList();
             var descriptionArg = cls.Description != null
                 ? $"\"{EscapeString(cls.Description)}\""
                 : "\"\"";
 
             sb.Append($"        new global::Shiny.Infrastructure.GeneratedRouteInfo(\"{EscapeString(cls.Route)}\", {descriptionArg}, [");
 
-            if (propsWithDesc.Any())
+            if (cls.Properties.Any())
             {
-                var paramEntries = propsWithDesc.Select(p =>
-                    $"new global::Shiny.Infrastructure.GeneratedRouteParameter(\"{EscapeString(p.Name)}\", \"{EscapeString(p.Description)}\")");
+                var paramEntries = cls.Properties.Select(p =>
+                {
+                    var desc = p.Description != null ? EscapeString(p.Description) : "";
+                    var requiredLiteral = p.IsRequired ? "true" : "false";
+                    return $"new global::Shiny.Infrastructure.GeneratedRouteParameter(\"{EscapeString(p.Name)}\", \"{desc}\", \"{EscapeString(p.TypeName)}\", {requiredLiteral})";
+                });
                 sb.Append(string.Join(", ", paramEntries));
             }
 
@@ -600,6 +609,59 @@ public class ShinyShellGenerator : IIncrementalGenerator
         }
 
         sb.AppendLine("    ];");
+
+        if (options.GenerateAiExtensions)
+        {
+            sb.AppendLine();
+
+            // Generate filtered AI-applicable routes
+            var aiClasses = classes.Where(c => c.Description != null && c.Properties.Any()).ToList();
+            sb.AppendLine("    [global::System.ComponentModel.Description(\"This provides a list of AI tool applicable routes - routes that have descriptions and parameters that an AI can populate from user intent\")]");
+            sb.AppendLine("    public static global::Shiny.Infrastructure.GeneratedRouteInfo[] GetAiToolApplicableGeneratedRoutes(this global::Shiny.INavigator navigator) =>");
+            sb.AppendLine("    [");
+
+            for (int i = 0; i < aiClasses.Count; i++)
+            {
+                var cls = aiClasses[i];
+                sb.AppendLine($"        new global::Shiny.Infrastructure.GeneratedRouteInfo(");
+                sb.AppendLine($"            \"{EscapeString(cls.Route)}\",");
+                sb.AppendLine($"            \"{EscapeString(cls.Description)}\",");
+                sb.AppendLine("            [");
+
+                var properties = cls.Properties.ToList();
+                for (int j = 0; j < properties.Count; j++)
+                {
+                    var p = properties[j];
+                    var desc = p.Description != null ? EscapeString(p.Description) : "";
+                    var requiredLiteral = p.IsRequired ? "true" : "false";
+                    sb.Append($"                new global::Shiny.Infrastructure.GeneratedRouteParameter(");
+                    sb.Append($"\"{EscapeString(p.Name)}\", \"{desc}\", \"{EscapeString(p.TypeName)}\", {requiredLiteral})");
+                    if (j < properties.Count - 1)
+                        sb.Append(",");
+                    sb.AppendLine();
+                }
+
+                sb.Append("            ]");
+                sb.Append(")");
+                if (i < aiClasses.Count - 1)
+                    sb.Append(",");
+                sb.AppendLine();
+            }
+
+            sb.AppendLine("    ];");
+            sb.AppendLine();
+            sb.AppendLine($"    [global::System.ComponentModel.Description(\"Navigate to a route in the application, passing parameters as key-value pairs. Use GetAiToolApplicableGeneratedRoutes to discover available routes and their parameters.\")]");
+            sb.AppendLine($"    public static global::System.Threading.Tasks.Task {options.AiNavigateMethodName}(");
+            sb.AppendLine("        this global::Shiny.INavigator navigator,");
+            sb.AppendLine("        [global::System.ComponentModel.Description(\"The route name to navigate to\")] string route,");
+            sb.AppendLine("        [global::System.ComponentModel.Description(\"Route parameters as key-value pairs where keys are parameter names from GetGeneratedRouteInfo\")] global::System.Collections.Generic.Dictionary<string, string>? args = null,");
+            sb.AppendLine("        [global::System.ComponentModel.Description(\"Navigate from the current page if true, otherwise reset the navigation stack\")] bool relativeNavigation = true)");
+            sb.AppendLine("    {");
+            sb.AppendLine("        var tuples = args?.Select(kvp => (kvp.Key, (object)kvp.Value)) ?? [];");
+            sb.AppendLine("        return navigator.NavigateTo(route, relativeNavigation, tuples);");
+            sb.AppendLine("    }");
+        }
+
         sb.AppendLine("}");
 
         context.AddSource("GeneratedRouteInfoExtensions.g.cs", sb.ToString());
@@ -632,6 +694,14 @@ public class ShinyShellGenerator : IIncrementalGenerator
         return typeName.EndsWith("?") || typeName == "string" ? "null" : "default";
     }
 }
+
+record GeneratorOptions(
+    bool GenerateRouteConstants,
+    bool GenerateNavExtensions,
+    bool GenerateAiExtensions,
+    string AiExtensionsClassName,
+    string AiNavigateMethodName
+);
 
 record ShellMapInfo(
     string ViewModelName,
