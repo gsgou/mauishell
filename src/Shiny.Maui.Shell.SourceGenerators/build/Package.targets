@@ -6,5 +6,6 @@
         <CompilerVisibleProperty Include="ShinyMauiShell_GenerateAiExtensions" />
         <CompilerVisibleProperty Include="ShinyMauiShell_AiExtensionsClassName" />
         <CompilerVisibleProperty Include="ShinyMauiShell_AiNavigateMethodName" />
+        <CompilerVisibleProperty Include="ShinyMauiShell_AiToolsClassName" />
     </ItemGroup>
 </Project>

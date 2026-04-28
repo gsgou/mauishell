@@ -56,13 +56,15 @@ public class ShinyShellGenerator : IIncrementalGenerator
                 provider.GlobalOptions.TryGetValue("build_property.ShinyMauiShell_GenerateAiExtensions", out var aiValue);
                 provider.GlobalOptions.TryGetValue("build_property.ShinyMauiShell_AiExtensionsClassName", out var aiClassName);
                 provider.GlobalOptions.TryGetValue("build_property.ShinyMauiShell_AiNavigateMethodName", out var aiNavigateMethodName);
-                // empty or missing is considered true for route/nav; only explicit "true" enables AI
+                provider.GlobalOptions.TryGetValue("build_property.ShinyMauiShell_AiToolsClassName", out var aiToolsClassName);
+                // empty or missing is considered true for route/nav/ai
                 return new GeneratorOptions(
                     GenerateRouteConstants: !string.Equals(routeValue, "false", StringComparison.OrdinalIgnoreCase),
                     GenerateNavExtensions: !string.Equals(navValue, "false", StringComparison.OrdinalIgnoreCase),
-                    GenerateAiExtensions: string.Equals(aiValue, "true", StringComparison.OrdinalIgnoreCase),
+                    GenerateAiExtensions: !string.Equals(aiValue, "false", StringComparison.OrdinalIgnoreCase),
                     AiExtensionsClassName: string.IsNullOrWhiteSpace(aiClassName) ? "AiExtensions" : aiClassName!.Trim(),
-                    AiNavigateMethodName: string.IsNullOrWhiteSpace(aiNavigateMethodName) ? "NavigateToRoute" : aiNavigateMethodName!.Trim()
+                    AiNavigateMethodName: string.IsNullOrWhiteSpace(aiNavigateMethodName) ? "NavigateToRoute" : aiNavigateMethodName!.Trim(),
+                    AiToolsClassName: string.IsNullOrWhiteSpace(aiToolsClassName) ? "AiMauiShellTools" : aiToolsClassName!.Trim()
                 );
             });
 
@@ -658,145 +660,183 @@ public class ShinyShellGenerator : IIncrementalGenerator
 
         if (options.GenerateAiExtensions && hasAiPackage)
         {
-            sb.AppendLine();
-
-            // Generate filtered AI-applicable routes
             var aiClasses = classes.Where(c => c.Description != null && c.Properties.Any()).ToList();
-            sb.AppendLine("    [global::System.ComponentModel.Description(\"This provides a list of AI tool applicable routes - routes that have descriptions and parameters that an AI can populate from user intent\")]");
-            sb.AppendLine("    public static global::Shiny.Infrastructure.GeneratedRouteInfo[] GetAiToolApplicableGeneratedRoutes(this global::Shiny.INavigator navigator) =>");
-            sb.AppendLine("    [");
-
-            for (int i = 0; i < aiClasses.Count; i++)
-            {
-                var cls = aiClasses[i];
-                sb.AppendLine($"        new global::Shiny.Infrastructure.GeneratedRouteInfo(");
-                sb.AppendLine($"            \"{EscapeString(cls.Route)}\",");
-                sb.AppendLine($"            \"{EscapeString(cls.Description)}\",");
-                sb.AppendLine("            [");
-
-                var properties = cls.Properties.ToList();
-                for (int j = 0; j < properties.Count; j++)
-                {
-                    var p = properties[j];
-                    var requiredLiteral = p.IsRequired ? "true" : "false";
-                    sb.Append($"                new global::Shiny.Infrastructure.GeneratedRouteParameter(");
-                    sb.Append($"\"{EscapeString(p.Name)}\", \"{GetParameterDescription(p)}\", \"{EscapeString(GetParameterTypeName(p))}\", {requiredLiteral})");
-                    if (j < properties.Count - 1)
-                        sb.Append(",");
-                    sb.AppendLine();
-                }
-
-                sb.Append("            ]");
-                sb.Append(")");
-                if (i < aiClasses.Count - 1)
-                    sb.Append(",");
-                sb.AppendLine();
-            }
-
-            sb.AppendLine("    ];");
-            sb.AppendLine();
-
-            // Generate AiRoutePrompt string constant
-            sb.AppendLine("    /// <summary>");
-            sb.AppendLine("    /// A pre-formatted prompt string describing all AI-applicable routes, their descriptions, and parameters.");
-            sb.AppendLine("    /// Designed to be included in an AI system message so the model knows which routes are available without calling a discovery tool first.");
-            sb.AppendLine("    /// </summary>");
-            sb.AppendLine("    public static string AiRoutePrompt(this global::Shiny.INavigator navigator) =>");
-
-            var promptBuilder = new StringBuilder();
-            promptBuilder.Append("Available routes:\\n");
-            foreach (var cls in aiClasses)
-            {
-                promptBuilder.Append($"- Route \\\"{EscapeString(cls.Route)}\\\": {EscapeString(cls.Description)}\\n");
-                promptBuilder.Append("  Parameters:\\n");
-                foreach (var p in cls.Properties)
-                {
-                    var desc = GetParameterDescription(p);
-                    var typeName = GetParameterTypeName(p);
-                    var req = p.IsRequired ? "required" : "optional";
-                    promptBuilder.Append($"    - {EscapeString(p.Name)} ({EscapeString(typeName)}, {req}): {desc}\\n");
-                }
-            }
-
-            sb.AppendLine($"        \"{promptBuilder}\";");
-            sb.AppendLine();
-            sb.AppendLine($"    [global::System.ComponentModel.Description(\"Navigate to a route in the application, passing parameters as key-value pairs. Returns a confirmation message.\")]");
-            sb.AppendLine($"    public static async global::System.Threading.Tasks.Task<string> {options.AiNavigateMethodName}(");
-            sb.AppendLine("        this global::Shiny.INavigator navigator,");
-            sb.AppendLine("        [global::System.ComponentModel.Description(\"The route name to navigate to\")] string route,");
-            sb.AppendLine("        [global::System.ComponentModel.Description(\"Route parameters as key-value pairs where keys are parameter names from GetGeneratedRouteInfo\")] global::System.Collections.Generic.Dictionary<string, string>? args = null)");
-            sb.AppendLine("    {");
-            sb.AppendLine("        switch (route)");
-            sb.AppendLine("        {");
-
-            foreach (var cls in aiClasses)
-            {
-                sb.AppendLine($"            case \"{EscapeString(cls.Route)}\":");
-                sb.AppendLine($"                await navigator.NavigateTo<{cls.ViewModelFullName}>(vm =>");
-                sb.AppendLine("                {");
-                sb.AppendLine("                    if (args != null)");
-                sb.AppendLine("                    {");
-
-                foreach (var p in cls.Properties)
-                {
-                    sb.AppendLine($"                        if (args.TryGetValue(\"{EscapeString(p.Name)}\", out var _{ToCamelCase(p.Name)}))");
-                    sb.AppendLine($"                            vm.{p.Name} = {GenerateConversion(p, $"_{ToCamelCase(p.Name)}")};");
-                }
-
-                sb.AppendLine("                    }");
-                sb.AppendLine("                });");
-                sb.AppendLine($"                return $\"Successfully navigated to {EscapeString(cls.Route)}\";");
-            }
-
-            sb.AppendLine("            default:");
-            sb.AppendLine("                return $\"Unknown route: {route}\";");
-            sb.AppendLine("        }");
-            sb.AppendLine("    }");
-            sb.AppendLine();
-
-            // Generate GetAiTools convenience method
-            sb.AppendLine("    /// <summary>");
-            sb.AppendLine("    /// Returns AI tools for route discovery and navigation, ready to use with Microsoft.Extensions.AI ChatOptions.Tools.");
-            sb.AppendLine("    /// </summary>");
-            sb.AppendLine("    public static global::System.Collections.Generic.IList<global::Microsoft.Extensions.AI.AITool> GetAiTools(this global::Shiny.INavigator navigator) =>");
-            sb.AppendLine("    [");
-            sb.AppendLine("        global::Microsoft.Extensions.AI.AIFunctionFactory.Create(");
-            sb.AppendLine("            () => navigator.GetAiToolApplicableGeneratedRoutes(),");
-            sb.AppendLine("            name: \"GetRoutes\",");
-            sb.AppendLine("            description: \"Returns a list of available application routes with their descriptions and parameter schemas\"),");
-            sb.AppendLine("        global::Microsoft.Extensions.AI.AIFunctionFactory.Create(");
-            sb.AppendLine($"            (string route, global::System.Collections.Generic.Dictionary<string, string>? args) => navigator.{options.AiNavigateMethodName}(route, args),");
-            sb.AppendLine($"            name: \"{options.AiNavigateMethodName}\",");
-
-            // Build a rich description that includes all route parameter schemas so the AI knows exactly what keys to pass
-            var navDescBuilder = new StringBuilder();
-            navDescBuilder.Append("Navigate to a route in the application. The 'args' parameter is a dictionary of key-value pairs where keys are parameter names from the route schema. ");
-            navDescBuilder.Append("Available routes and their parameters: ");
-            foreach (var cls in aiClasses)
-            {
-                navDescBuilder.Append($"{cls.Route}(");
-                var props = cls.Properties.ToList();
-                for (int j = 0; j < props.Count; j++)
-                {
-                    var p = props[j];
-                    navDescBuilder.Append(p.Name);
-                    if (p.IsEnum && !p.EnumValues.IsDefaultOrEmpty)
-                        navDescBuilder.Append($": {string.Join("|", p.EnumValues)}");
-                    if (!p.IsRequired)
-                        navDescBuilder.Append("?");
-                    if (j < props.Count - 1)
-                        navDescBuilder.Append(", ");
-                }
-                navDescBuilder.Append(") ");
-            }
-
-            sb.AppendLine($"            description: \"{EscapeString(navDescBuilder.ToString().TrimEnd())}\")");
-            sb.AppendLine("    ];");
+            GenerateAiMauiShellToolsClass(sb, aiClasses, options);
         }
 
         sb.AppendLine("}");
 
         context.AddSource("AiExtensions.g.cs", sb.ToString());
+    }
+
+    static void GenerateAiMauiShellToolsClass(StringBuilder sb, System.Collections.Generic.List<ShellMapInfo> aiClasses, GeneratorOptions options)
+    {
+        sb.AppendLine();
+        sb.AppendLine("}"); // close the static extensions class
+        sb.AppendLine();
+
+        sb.AppendLine("/// <summary>");
+        sb.AppendLine("/// Provides AI tools and a pre-formatted prompt for route discovery and navigation.");
+        sb.AppendLine("/// Register this class in DI and inject it where AI chat functionality is needed.");
+        sb.AppendLine("/// </summary>");
+        sb.AppendLine($"public class {options.AiToolsClassName}");
+        sb.AppendLine("{");
+        sb.AppendLine("    readonly global::Shiny.INavigator _navigator;");
+        sb.AppendLine();
+
+        // Prompt property
+        var promptBuilder = new StringBuilder();
+        promptBuilder.Append("Available routes:\\n");
+        foreach (var cls in aiClasses)
+        {
+            promptBuilder.Append($"- Route \\\"{EscapeString(cls.Route)}\\\": {EscapeString(cls.Description)}\\n");
+            promptBuilder.Append("  Parameters:\\n");
+            foreach (var p in cls.Properties)
+            {
+                var desc = GetParameterDescription(p);
+                var typeName = GetParameterTypeName(p);
+                var req = p.IsRequired ? "required" : "optional";
+                promptBuilder.Append($"    - {EscapeString(p.Name)} ({EscapeString(typeName)}, {req}): {desc}\\n");
+            }
+        }
+
+        sb.AppendLine("    /// <summary>");
+        sb.AppendLine("    /// A pre-formatted prompt string describing all AI-applicable routes, their descriptions, and parameters.");
+        sb.AppendLine("    /// Designed to be included in an AI system message so the model knows which routes are available without calling a discovery tool first.");
+        sb.AppendLine("    /// </summary>");
+        sb.AppendLine($"    public string Prompt {{ get; }} = \"{promptBuilder}\";");
+        sb.AppendLine();
+
+        sb.AppendLine("    /// <summary>");
+        sb.AppendLine("    /// AI tools for route discovery and navigation, ready to use with Microsoft.Extensions.AI ChatOptions.Tools.");
+        sb.AppendLine("    /// </summary>");
+        sb.AppendLine("    public global::Microsoft.Extensions.AI.AITool[] Tools { get; }");
+        sb.AppendLine();
+
+        // Constructor
+        sb.AppendLine($"    public {options.AiToolsClassName}(global::Shiny.INavigator navigator)");
+        sb.AppendLine("    {");
+        sb.AppendLine("        _navigator = navigator;");
+        sb.AppendLine("        Tools =");
+        sb.AppendLine("        [");
+        sb.AppendLine("            global::Microsoft.Extensions.AI.AIFunctionFactory.Create(");
+        sb.AppendLine("                () => GetAiToolApplicableGeneratedRoutes(),");
+        sb.AppendLine("                name: \"GetRoutes\",");
+        sb.AppendLine("                description: \"Returns a list of available application routes with their descriptions and parameter schemas\"),");
+        sb.AppendLine("            global::Microsoft.Extensions.AI.AIFunctionFactory.Create(");
+        sb.AppendLine($"                (string route, global::System.Collections.Generic.Dictionary<string, string>? args) => {options.AiNavigateMethodName}(route, args),");
+        sb.AppendLine($"                name: \"{options.AiNavigateMethodName}\",");
+
+        // Build a rich description for the navigate tool
+        var navDescBuilder = new StringBuilder();
+        navDescBuilder.Append("Navigate to a route in the application. The 'args' parameter is a dictionary of key-value pairs where keys are parameter names from the route schema. ");
+        navDescBuilder.Append("Available routes and their parameters: ");
+        foreach (var cls in aiClasses)
+        {
+            navDescBuilder.Append($"{cls.Route}(");
+            var props = cls.Properties.ToList();
+            for (int j = 0; j < props.Count; j++)
+            {
+                var p = props[j];
+                navDescBuilder.Append(p.Name);
+                if (p.IsEnum && !p.EnumValues.IsDefaultOrEmpty)
+                    navDescBuilder.Append($": {string.Join("|", p.EnumValues)}");
+                if (!p.IsRequired)
+                    navDescBuilder.Append("?");
+                if (j < props.Count - 1)
+                    navDescBuilder.Append(", ");
+            }
+            navDescBuilder.Append(") ");
+        }
+
+        sb.AppendLine($"                description: \"{EscapeString(navDescBuilder.ToString().TrimEnd())}\")");
+        sb.AppendLine("        ];");
+        sb.AppendLine("    }");
+        sb.AppendLine();
+
+        // GetAiToolApplicableGeneratedRoutes
+        sb.AppendLine("    [global::System.ComponentModel.Description(\"This provides a list of AI tool applicable routes - routes that have descriptions and parameters that an AI can populate from user intent\")]");
+        sb.AppendLine("    public global::Shiny.Infrastructure.GeneratedRouteInfo[] GetAiToolApplicableGeneratedRoutes() =>");
+        sb.AppendLine("    [");
+
+        for (int i = 0; i < aiClasses.Count; i++)
+        {
+            var cls = aiClasses[i];
+            sb.AppendLine($"        new global::Shiny.Infrastructure.GeneratedRouteInfo(");
+            sb.AppendLine($"            \"{EscapeString(cls.Route)}\",");
+            sb.AppendLine($"            \"{EscapeString(cls.Description)}\",");
+            sb.AppendLine("            [");
+
+            var properties = cls.Properties.ToList();
+            for (int j = 0; j < properties.Count; j++)
+            {
+                var p = properties[j];
+                var requiredLiteral = p.IsRequired ? "true" : "false";
+                sb.Append($"                new global::Shiny.Infrastructure.GeneratedRouteParameter(");
+                sb.Append($"\"{EscapeString(p.Name)}\", \"{GetParameterDescription(p)}\", \"{EscapeString(GetParameterTypeName(p))}\", {requiredLiteral})");
+                if (j < properties.Count - 1)
+                    sb.Append(",");
+                sb.AppendLine();
+            }
+
+            sb.Append("            ]");
+            sb.Append(")");
+            if (i < aiClasses.Count - 1)
+                sb.Append(",");
+            sb.AppendLine();
+        }
+
+        sb.AppendLine("    ];");
+        sb.AppendLine();
+
+        // NavigateToRoute method
+        sb.AppendLine($"    [global::System.ComponentModel.Description(\"Navigate to a route in the application, passing parameters as key-value pairs. Returns a confirmation message.\")]");
+        sb.AppendLine($"    public async global::System.Threading.Tasks.Task<string> {options.AiNavigateMethodName}(");
+        sb.AppendLine("        [global::System.ComponentModel.Description(\"The route name to navigate to\")] string route,");
+        sb.AppendLine("        [global::System.ComponentModel.Description(\"Route parameters as key-value pairs where keys are parameter names from GetGeneratedRouteInfo\")] global::System.Collections.Generic.Dictionary<string, string>? args = null)");
+        sb.AppendLine("    {");
+        sb.AppendLine("        switch (route)");
+        sb.AppendLine("        {");
+
+        foreach (var cls in aiClasses)
+        {
+            sb.AppendLine($"            case \"{EscapeString(cls.Route)}\":");
+            sb.AppendLine($"                await _navigator.NavigateTo<{cls.ViewModelFullName}>(vm =>");
+            sb.AppendLine("                {");
+            sb.AppendLine("                    if (args != null)");
+            sb.AppendLine("                    {");
+
+            foreach (var p in cls.Properties)
+            {
+                sb.AppendLine($"                        if (args.TryGetValue(\"{EscapeString(p.Name)}\", out var _{ToCamelCase(p.Name)}))");
+                sb.AppendLine($"                            vm.{p.Name} = {GenerateConversion(p, $"_{ToCamelCase(p.Name)}")};");
+            }
+
+            sb.AppendLine("                    }");
+            sb.AppendLine("                });");
+            sb.AppendLine($"                return $\"Successfully navigated to {EscapeString(cls.Route)}\";");
+        }
+
+        sb.AppendLine("            default:");
+        sb.AppendLine("                return $\"Unknown route: {route}\";");
+        sb.AppendLine("        }");
+        sb.AppendLine("    }");
+        sb.AppendLine("}"); // close AiMauiShellTools class
+        sb.AppendLine();
+
+        // Generate AddAiTools extension method on ShinyAppBuilder
+        sb.AppendLine($"public static class {options.AiToolsClassName}Extensions");
+        sb.AppendLine("{");
+        sb.AppendLine("    /// <summary>");
+        sb.AppendLine($"    /// Registers <see cref=\"{options.AiToolsClassName}\"/> as a singleton in the service collection.");
+        sb.AppendLine("    /// </summary>");
+        sb.AppendLine($"    public static global::Shiny.ShinyAppBuilder AddAiTools(this global::Shiny.ShinyAppBuilder builder)");
+        sb.AppendLine("    {");
+        sb.AppendLine($"        builder.MauiBuilder.Services.AddSingleton<{options.AiToolsClassName}>();");
+        sb.AppendLine("        return builder;");
+        sb.AppendLine("    }");
+
+        // The caller adds the final "}" to close this class
     }
 
     static string ToCamelCase(string text)
@@ -882,7 +922,8 @@ record GeneratorOptions(
     bool GenerateNavExtensions,
     bool GenerateAiExtensions,
     string AiExtensionsClassName,
-    string AiNavigateMethodName
+    string AiNavigateMethodName,
+    string AiToolsClassName
 );
 
 record ShellMapInfo(
