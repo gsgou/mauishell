@@ -14,6 +14,7 @@ public static class MauiProgram
             .UseShinyShell(x => x
                 .UseUxDiversDialogs()
                 .AddGeneratedMaps()
+                .AddAiTools()
             )
             .ConfigureFonts(fonts =>
             {

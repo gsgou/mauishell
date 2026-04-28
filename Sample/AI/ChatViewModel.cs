@@ -14,7 +14,7 @@ namespace Sample.AI;
 
 [ShellMap<ChatPage>]
 public partial class ChatViewModel(
-    INavigator navigator,
+    AiMauiShellTools aiTools,
     GitHubCopilotAuthService authService
 ) : ObservableObject, IPageLifecycleAware
 {
@@ -158,19 +158,19 @@ public partial class ChatViewModel(
             .Build();
 
         history.Clear();
-        Debug.WriteLine($"[AI] AiRoutePrompt:\n{navigator.AiRoutePrompt()}");
+        Debug.WriteLine($"[AI] AiRoutePrompt:\n{aiTools.Prompt}");
         history.Add(new AIChatMessage(ChatRole.System,
             $"""
             You are a helpful assistant integrated in a .NET MAUI app. You can navigate the user to pages and pre-fill forms using the NavigateToRoute tool.
 
-            {navigator.AiRoutePrompt()}
+            {aiTools.Prompt}
             When the user describes a problem, request, or intent that matches a route, call NavigateToRoute immediately with the appropriate route and parameters inferred from what the user said. Do not ask the user to confirm parameters unless something is genuinely ambiguous.
 
             When the user first greets you or asks what you can do, briefly describe your capabilities based on the available routes above.
             """));
 
         // Build a welcome message describing what the bot can do based on available routes
-        var routes = navigator.GetAiToolApplicableGeneratedRoutes();
+        var routes = aiTools.GetAiToolApplicableGeneratedRoutes();
         var capabilities = string.Join("\n", routes.Select(r => $"- {r.Description}"));
         Messages.Add(new ChatMessage
         {
@@ -197,12 +197,11 @@ public partial class ChatViewModel(
             IsBusy = true;
             cts = new CancellationTokenSource();
 
-            var tools = navigator.GetAiTools();
             Debug.WriteLine("[AI] Registered tools:");
-            foreach (var tool in tools)
+            foreach (var tool in aiTools.Tools)
                 Debug.WriteLine($"  - {tool}");
 
-            var options = new ChatOptions { Tools = [.. tools] };
+            var options = new ChatOptions { Tools = [.. aiTools.Tools] };
 
             // Send only the system prompt + the current user message (not full history)
             var messages = new List<AIChatMessage>
