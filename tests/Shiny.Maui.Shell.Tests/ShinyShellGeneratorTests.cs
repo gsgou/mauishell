@@ -1089,6 +1089,124 @@ namespace TestApp
     }
 
     [Fact]
+    public void AiExtensions_EnabledButNoDescriptions_StillGeneratesAiMauiShellToolsClass()
+    {
+        var source = StubTypes + @"
+namespace TestApp
+{
+    public class HomePage : Microsoft.Maui.Controls.Page { }
+    public class SettingsPage : Microsoft.Maui.Controls.Page { }
+
+    [ShellMap<HomePage>]
+    public class HomeViewModel : System.ComponentModel.INotifyPropertyChanged
+    {
+        public event System.ComponentModel.PropertyChangedEventHandler? PropertyChanged;
+    }
+
+    [ShellMap<SettingsPage>(registerRoute: false)]
+    public class SettingsViewModel : System.ComponentModel.INotifyPropertyChanged
+    {
+        public event System.ComponentModel.PropertyChangedEventHandler? PropertyChanged;
+    }
+}";
+        var result = RunGenerator(source, ("ShinyMauiShell_GenerateAiExtensions", "true"));
+        var routeInfoSource = GetGeneratedSource(result, "AiExtensions.g.cs");
+
+        routeInfoSource.ShouldContain("class AiMauiShellTools");
+        routeInfoSource.ShouldContain("AddAiTools");
+        routeInfoSource.ShouldContain("NavigateToRoute(");
+        routeInfoSource.ShouldContain("GetAiToolApplicableGeneratedRoutes");
+    }
+
+    [Fact]
+    public void AiExtensions_DescriptionWithoutProperties_IncludedInAiTools()
+    {
+        var source = StubTypes + @"
+namespace TestApp
+{
+    public class HomePage : Microsoft.Maui.Controls.Page { }
+
+    [ShellMap<HomePage>(description: ""Go to the home page"")]
+    public class HomeViewModel : System.ComponentModel.INotifyPropertyChanged
+    {
+        public event System.ComponentModel.PropertyChangedEventHandler? PropertyChanged;
+    }
+}";
+        var result = RunGenerator(source, ("ShinyMauiShell_GenerateAiExtensions", "true"));
+        var routeInfoSource = GetGeneratedSource(result, "AiExtensions.g.cs");
+
+        routeInfoSource.ShouldContain("class AiMauiShellTools");
+        routeInfoSource.ShouldContain("Go to the home page");
+        routeInfoSource.ShouldContain("case \"HomePage\":");
+    }
+
+    [Fact]
+    public void AiExtensions_PropertyDescriptionsWithoutRouteDescription_ReportsSHINY004()
+    {
+        var source = StubTypes + @"
+namespace TestApp
+{
+    public class DetailPage : Microsoft.Maui.Controls.Page { }
+
+    [ShellMap<DetailPage>]
+    public class DetailViewModel : System.ComponentModel.INotifyPropertyChanged
+    {
+        public event System.ComponentModel.PropertyChangedEventHandler? PropertyChanged;
+
+        [ShellProperty(""The item ID"")]
+        public int Id { get; set; }
+    }
+}";
+        var result = RunGenerator(source, ("ShinyMauiShell_GenerateAiExtensions", "true"));
+
+        result.Diagnostics.ShouldContain(d => d.Id == "SHINY004");
+    }
+
+    [Fact]
+    public void AiExtensions_PropertyDescriptionsWithRouteDescription_NoSHINY004()
+    {
+        var source = StubTypes + @"
+namespace TestApp
+{
+    public class DetailPage : Microsoft.Maui.Controls.Page { }
+
+    [ShellMap<DetailPage>(description: ""View details"")]
+    public class DetailViewModel : System.ComponentModel.INotifyPropertyChanged
+    {
+        public event System.ComponentModel.PropertyChangedEventHandler? PropertyChanged;
+
+        [ShellProperty(""The item ID"")]
+        public int Id { get; set; }
+    }
+}";
+        var result = RunGenerator(source, ("ShinyMauiShell_GenerateAiExtensions", "true"));
+
+        result.Diagnostics.ShouldNotContain(d => d.Id == "SHINY004");
+    }
+
+    [Fact]
+    public void AiExtensions_PropertyDescriptionsWithoutRouteDescription_NoSHINY004WhenAiDisabled()
+    {
+        var source = StubTypes + @"
+namespace TestApp
+{
+    public class DetailPage : Microsoft.Maui.Controls.Page { }
+
+    [ShellMap<DetailPage>]
+    public class DetailViewModel : System.ComponentModel.INotifyPropertyChanged
+    {
+        public event System.ComponentModel.PropertyChangedEventHandler? PropertyChanged;
+
+        [ShellProperty(""The item ID"")]
+        public int Id { get; set; }
+    }
+}";
+        var result = RunGenerator(source);
+
+        result.Diagnostics.ShouldNotContain(d => d.Id == "SHINY004");
+    }
+
+    [Fact]
     public void AiExtensions_NotSet_NoSHINY003WhenAiPackageMissing()
     {
         var source = StubTypes.Replace(
