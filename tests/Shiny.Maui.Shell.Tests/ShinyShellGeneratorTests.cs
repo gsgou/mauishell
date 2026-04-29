@@ -932,7 +932,7 @@ namespace TestApp
     }
 
     [Fact]
-    public void AiExtensions_DisabledViaProperty_NoAiMethodsGenerated()
+    public void AiExtensions_DisabledViaProperty_NotGenerated()
     {
         var source = StubTypes + @"
 namespace TestApp
@@ -949,12 +949,8 @@ namespace TestApp
     }
 }";
         var result = RunGenerator(source, ("ShinyMauiShell_GenerateAiExtensions", "false"));
-        var routeInfoSource = GetGeneratedSource(result, "AiExtensions.g.cs");
 
-        routeInfoSource.ShouldContain("GetGeneratedRouteInfo");
-        routeInfoSource.ShouldNotContain("GetAiToolApplicableGeneratedRoutes");
-        routeInfoSource.ShouldNotContain("NavigateToRoute");
-        routeInfoSource.ShouldNotContain("class AiMauiShellTools");
+        GetGeneratedSourceOrDefault(result, "AiExtensions.g.cs").ShouldBeNull();
     }
 
     [Fact]
@@ -1027,12 +1023,8 @@ namespace TestApp
     }
 }";
         var result = RunGenerator(source);
-        var routeInfoSource = GetGeneratedSource(result, "AiExtensions.g.cs");
 
-        routeInfoSource.ShouldContain("GetGeneratedRouteInfo");
-        routeInfoSource.ShouldNotContain("class AiMauiShellTools");
-        routeInfoSource.ShouldNotContain("AddAiTools");
-        routeInfoSource.ShouldNotContain("NavigateToRoute(");
+        GetGeneratedSourceOrDefault(result, "AiExtensions.g.cs").ShouldBeNull();
     }
 
     [Fact]
@@ -1053,11 +1045,8 @@ namespace TestApp
     }
 }";
         var result = RunGenerator(source, ("ShinyMauiShell_GenerateAiExtensions", ""));
-        var routeInfoSource = GetGeneratedSource(result, "AiExtensions.g.cs");
 
-        routeInfoSource.ShouldContain("GetGeneratedRouteInfo");
-        routeInfoSource.ShouldNotContain("class AiMauiShellTools");
-        routeInfoSource.ShouldNotContain("AddAiTools");
+        GetGeneratedSourceOrDefault(result, "AiExtensions.g.cs").ShouldBeNull();
     }
 
     [Fact]
@@ -1305,10 +1294,8 @@ namespace TestApp
     }
 }";
         var result = RunGenerator(source, ("ShinyMauiShell_GenerateAiExtensions", "false"));
-        var routeInfoSource = GetGeneratedSource(result, "AiExtensions.g.cs");
 
-        routeInfoSource.ShouldNotContain("class AiMauiShellTools");
-        routeInfoSource.ShouldNotContain("AddAiTools");
+        GetGeneratedSourceOrDefault(result, "AiExtensions.g.cs").ShouldBeNull();
     }
 
     [Fact]

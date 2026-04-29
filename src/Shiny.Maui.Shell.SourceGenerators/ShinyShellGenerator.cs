@@ -422,7 +422,11 @@ public class ShinyShellGenerator : IIncrementalGenerator
             GenerateNavigationBuilderExtensions(context, filtered);
             GenerateNavigationExtensions(context, filtered);
             GenerateNavigationBuilderNavExtensions(context, filtered);
-            GenerateRouteInfoExtension(context, filtered, options, hasAiPackage);
+        }
+
+        if (options.GenerateAiExtensions && hasAiPackage)
+        {
+            GenerateAiExtensions(context, filtered, options);
         }
         else
         {
@@ -631,7 +635,7 @@ public class ShinyShellGenerator : IIncrementalGenerator
         context.AddSource("NavigationBuilderNavExtensions.g.cs", sb.ToString());
     }
 
-    static void GenerateRouteInfoExtension(SourceProductionContext context, ImmutableArray<ShellMapInfo> classes, GeneratorOptions options, bool hasAiPackage)
+    static void GenerateAiExtensions(SourceProductionContext context, ImmutableArray<ShellMapInfo> classes, GeneratorOptions options)
     {
         var sb = new StringBuilder();
         sb.AppendLine("#nullable enable");
@@ -681,11 +685,8 @@ public class ShinyShellGenerator : IIncrementalGenerator
 
         sb.AppendLine("    ];");
 
-        if (options.GenerateAiExtensions && hasAiPackage)
-        {
-            var aiClasses = classes.Where(c => c.Description != null).ToList();
-            GenerateAiMauiShellToolsClass(sb, aiClasses, options);
-        }
+        var aiClasses = classes.Where(c => c.Description != null).ToList();
+        GenerateAiMauiShellToolsClass(sb, aiClasses, options);
 
         sb.AppendLine("}");
 
