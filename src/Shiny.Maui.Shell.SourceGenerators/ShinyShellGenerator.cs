@@ -57,11 +57,11 @@ public class ShinyShellGenerator : IIncrementalGenerator
                 provider.GlobalOptions.TryGetValue("build_property.ShinyMauiShell_AiExtensionsClassName", out var aiClassName);
                 provider.GlobalOptions.TryGetValue("build_property.ShinyMauiShell_AiNavigateMethodName", out var aiNavigateMethodName);
                 provider.GlobalOptions.TryGetValue("build_property.ShinyMauiShell_AiToolsClassName", out var aiToolsClassName);
-                // empty or missing is considered true for route/nav/ai
+                // empty or missing is considered true for route/nav, but false for ai (opt-in)
                 return new GeneratorOptions(
                     GenerateRouteConstants: !string.Equals(routeValue, "false", StringComparison.OrdinalIgnoreCase),
                     GenerateNavExtensions: !string.Equals(navValue, "false", StringComparison.OrdinalIgnoreCase),
-                    GenerateAiExtensions: !string.Equals(aiValue, "false", StringComparison.OrdinalIgnoreCase),
+                    GenerateAiExtensions: string.Equals(aiValue, "true", StringComparison.OrdinalIgnoreCase),
                     AiExtensionsClassName: string.IsNullOrWhiteSpace(aiClassName) ? "AiExtensions" : aiClassName!.Trim(),
                     AiNavigateMethodName: string.IsNullOrWhiteSpace(aiNavigateMethodName) ? "NavigateToRoute" : aiNavigateMethodName!.Trim(),
                     AiToolsClassName: string.IsNullOrWhiteSpace(aiToolsClassName) ? "AiMauiShellTools" : aiToolsClassName!.Trim()
