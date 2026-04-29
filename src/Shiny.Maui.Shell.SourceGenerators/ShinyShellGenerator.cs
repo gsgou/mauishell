@@ -38,6 +38,15 @@ public class ShinyShellGenerator : IIncrementalGenerator
         DiagnosticSeverity.Error,
         isEnabledByDefault: true
     );
+
+    static readonly DiagnosticDescriptor AiPropertyDescriptionsWithoutRouteDescription = new(
+        "SHINY004",
+        "ShellProperty descriptions without ShellMap description",
+        "The route '{0}' has ShellProperty attributes with descriptions but the ShellMap attribute has no description. AI tools cannot determine when to navigate to this route without a description. Add a description to the ShellMap attribute.",
+        "Shiny.Shell",
+        DiagnosticSeverity.Warning,
+        isEnabledByDefault: true
+    );
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {
         // Find classes with ShellMapAttribute
@@ -393,13 +402,31 @@ public class ShinyShellGenerator : IIncrementalGenerator
                 Location.None));
         }
 
+        if (options.GenerateAiExtensions)
+        {
+            foreach (var cls in filtered)
+            {
+                if (cls.Description == null && cls.Properties.Any(p => p.Description != null))
+                {
+                    context.ReportDiagnostic(Diagnostic.Create(
+                        AiPropertyDescriptionsWithoutRouteDescription,
+                        cls.AttributeLocation,
+                        cls.Route));
+                }
+            }
+        }
+
         // Generate AddGeneratedMaps and nav extensions only if enabled
         if (options.GenerateNavExtensions)
         {
             GenerateNavigationBuilderExtensions(context, filtered);
             GenerateNavigationExtensions(context, filtered);
             GenerateNavigationBuilderNavExtensions(context, filtered);
-            GenerateRouteInfoExtension(context, filtered, options, hasAiPackage);
+        }
+
+        if (options.GenerateAiExtensions && hasAiPackage)
+        {
+            GenerateAiExtensions(context, filtered, options);
         }
         else
         {
@@ -608,7 +635,7 @@ public class ShinyShellGenerator : IIncrementalGenerator
         context.AddSource("NavigationBuilderNavExtensions.g.cs", sb.ToString());
     }
 
-    static void GenerateRouteInfoExtension(SourceProductionContext context, ImmutableArray<ShellMapInfo> classes, GeneratorOptions options, bool hasAiPackage)
+    static void GenerateAiExtensions(SourceProductionContext context, ImmutableArray<ShellMapInfo> classes, GeneratorOptions options)
     {
         var sb = new StringBuilder();
         sb.AppendLine("#nullable enable");
@@ -658,11 +685,8 @@ public class ShinyShellGenerator : IIncrementalGenerator
 
         sb.AppendLine("    ];");
 
-        if (options.GenerateAiExtensions && hasAiPackage)
-        {
-            var aiClasses = classes.Where(c => c.Description != null && c.Properties.Any()).ToList();
-            GenerateAiMauiShellToolsClass(sb, aiClasses, options);
-        }
+        var aiClasses = classes.Where(c => c.Description != null).ToList();
+        GenerateAiMauiShellToolsClass(sb, aiClasses, options);
 
         sb.AppendLine("}");
 
@@ -801,19 +825,26 @@ public class ShinyShellGenerator : IIncrementalGenerator
         foreach (var cls in aiClasses)
         {
             sb.AppendLine($"            case \"{EscapeString(cls.Route)}\":");
-            sb.AppendLine($"                await _navigator.NavigateTo<{cls.ViewModelFullName}>(vm =>");
-            sb.AppendLine("                {");
-            sb.AppendLine("                    if (args != null)");
-            sb.AppendLine("                    {");
-
-            foreach (var p in cls.Properties)
+            if (cls.Properties.Any())
             {
-                sb.AppendLine($"                        if (args.TryGetValue(\"{EscapeString(p.Name)}\", out var _{ToCamelCase(p.Name)}))");
-                sb.AppendLine($"                            vm.{p.Name} = {GenerateConversion(p, $"_{ToCamelCase(p.Name)}")};");
-            }
+                sb.AppendLine($"                await _navigator.NavigateTo<{cls.ViewModelFullName}>(vm =>");
+                sb.AppendLine("                {");
+                sb.AppendLine("                    if (args != null)");
+                sb.AppendLine("                    {");
 
-            sb.AppendLine("                    }");
-            sb.AppendLine("                });");
+                foreach (var p in cls.Properties)
+                {
+                    sb.AppendLine($"                        if (args.TryGetValue(\"{EscapeString(p.Name)}\", out var _{ToCamelCase(p.Name)}))");
+                    sb.AppendLine($"                            vm.{p.Name} = {GenerateConversion(p, $"_{ToCamelCase(p.Name)}")};");
+                }
+
+                sb.AppendLine("                    }");
+                sb.AppendLine("                });");
+            }
+            else
+            {
+                sb.AppendLine($"                await _navigator.NavigateTo<{cls.ViewModelFullName}>();");
+            }
             sb.AppendLine($"                return $\"Successfully navigated to {EscapeString(cls.Route)}\";");
         }
 

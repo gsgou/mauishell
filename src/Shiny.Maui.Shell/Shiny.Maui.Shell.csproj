@@ -14,13 +14,13 @@
     <ItemGroup>
         <None Include="..\Shiny.Maui.Shell.SourceGenerators\build\Package.targets"
               Pack="True"
-              PackagePath="build/Shiny.Maui.Shell.SourceGenerators.targets" />
-    
+              PackagePath="build/Shiny.Maui.Shell.targets" />
+
         <None Include="..\Shiny.Maui.Shell.SourceGenerators\build\Package.targets"
               Pack="True"
-              PackagePath="buildTransitive/Shiny.Maui.Shell.SourceGenerators.targets" />
+              PackagePath="buildTransitive/Shiny.Maui.Shell.targets" />
     
-        <None Include="..\Shiny.Maui.Shell.SourceGenerators\bin\Release\netstandard2.0\Shiny.Maui.Shell.SourceGenerators.dll"
+        <None Include="..\Shiny.Maui.Shell.SourceGenerators\bin\$(Configuration)\netstandard2.0\Shiny.Maui.Shell.SourceGenerators.dll"
               Pack="true"
               PackagePath="analyzers/dotnet/cs"
               Visible="false" />

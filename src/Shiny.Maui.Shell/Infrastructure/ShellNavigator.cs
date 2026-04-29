@@ -3,29 +3,30 @@ using Microsoft.Extensions.Logging;
 namespace Shiny.Infrastructure;
 
 
-// TODO: //PageName and ../../PageName or ../Page1/Page2
-// TODO: replace route, backCount = 2, relative
 public class ShinyShellNavigator(
     ILogger<ShinyShellNavigator> logger,
-    IApplication application,
     IMainThread mainThread,
-    IServiceProvider services,
     ShinyAppBuilder navBuilder,
     ShellTabBadgeManager tabBadgeManager
 ) : INavigator, IMauiInitializeService, IDisposable
 {
     public event EventHandler<NavigationEventArgs>? Navigating;
     public event EventHandler<NavigatedEventArgs>? Navigated;
+    IServiceProvider services = null!;
+    Application application = null!;
 
     record PendingNavigation(string ToUri, NavigationType NavigationType, IReadOnlyDictionary<string, object> Parameters);
     PendingNavigation? pendingNavigation;
     bool isProgrammaticNavigation;
 
-    public void Initialize(IServiceProvider _)
+    public void Initialize(IServiceProvider serviceProvider)
     {
-        if (application is not Application app)
+        var appService = serviceProvider.GetService<IApplication>();
+        if (appService is not Application app)
             throw new InvalidOperationException($"Invalid MAUI Application - {application.GetType()}");
 
+        this.services = serviceProvider;
+        this.application = app;
         app.DescendantAdded += this.AppOnDescendantAdded;
         app.DescendantRemoved += this.AppOnDescendantRemoved;
         app.PageAppearing += this.AppOnPageAppearing;
@@ -40,13 +41,13 @@ public class ShinyShellNavigator(
     
     public void Dispose()
     {
-        if (application is Application app)
-        {
-            app.DescendantAdded -= this.AppOnDescendantAdded;
-            app.DescendantRemoved -= this.AppOnDescendantRemoved;
-            app.PageAppearing -= this.AppOnPageAppearing;
-            app.PageDisappearing -= this.AppOnPageDisappearing;
-        }
+        if (this.application == null)
+            return;
+        
+        this.application.DescendantAdded -= this.AppOnDescendantAdded;
+        this.application.DescendantRemoved -= this.AppOnDescendantRemoved;
+        this.application.PageAppearing -= this.AppOnPageAppearing;
+        this.application.PageDisappearing -= this.AppOnPageDisappearing;
     }
 
     
