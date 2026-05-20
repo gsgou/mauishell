@@ -150,37 +150,29 @@ public class ShinyShellNavigator(
         if (!relativeNavigation)
             route = $"//{route}";
 
-        var tcs = new TaskCompletionSource();
-        var handler = new EventHandler<Page>((_, page) =>
-        {
-            if (page.BindingContext is TViewModel vm)
-            {
-                logger.LogDebug("Pre-Configuring ViewModel");
-                configure?.Invoke(vm);
-                tcs.TrySetResult();
-            }
-            else
-                tcs.TrySetException(new InvalidOperationException($"Page BindingContext is not of type '{typeof(TViewModel)}'"));
-        });
+        var parameters = args.ToDictionary(x => x.Key, x => x.Value);
+        if (Shell.Current.CurrentPage?.BindingContext is INavigationAware navAware)
+            navAware.OnNavigatingFrom(parameters);
 
-        try
-        {
-            var parameters = args.ToDictionary(x => x.Key, x => x.Value);
-            if (Shell.Current.CurrentPage?.BindingContext is INavigationAware navAware)
-                navAware.OnNavigatingFrom(parameters);
+        var navType = relativeNavigation ? NavigationType.Push : NavigationType.SetRoot;
+        this.RaiseNavigating(Shell.Current, route, navType, parameters);
+        this.isProgrammaticNavigation = true;
 
-            var navType = relativeNavigation ? NavigationType.Push : NavigationType.SetRoot;
-            this.RaiseNavigating(Shell.Current, route, navType, parameters);
+        await mainThread.InvokeOnMainThreadAsync(() => Shell.Current.GoToAsync(route, true, parameters));
 
-            ShinyRouteFactory.PageResolved += handler;
-            this.isProgrammaticNavigation = true;
-            await mainThread.InvokeOnMainThreadAsync(() => Shell.Current.GoToAsync(route, true, parameters));
-            await tcs.Task.ConfigureAwait(false);
-        }
-        finally
-        {
-            ShinyRouteFactory.PageResolved -= handler;
-        }
+        // Check the post-navigation page directly. Works uniformly for registered
+        // routes (BindingContext set by ShinyRouteFactory.GetOrCreate) and for
+        // ShellContent routes declared in AppShell.xaml (BindingContext set by
+        // ShinyShell.OnNavigated / AppOnPageAppearing). The previous approach
+        // awaited the static ShinyRouteFactory.PageResolved event, which never
+        // fires for ShellContent pages — leaking handlers that would later wake
+        // on an unrelated registered-route navigation and throw with a misleading
+        // "Page BindingContext is not of type ..." against the wrong target page.
+        var page = Shell.Current.CurrentPage;
+        if (page?.BindingContext is not TViewModel vm)
+            throw new InvalidOperationException($"Page BindingContext is not of type '{typeof(TViewModel)}'");
+
+        configure?.Invoke(vm);
     }
 
     

@@ -9,9 +9,6 @@ public class ShinyRouteFactory(Type pageType, Type viewModelType) : RouteFactory
     {
         var page = (Page)services.GetRequiredService(pageType);
         page.BindingContext = services.GetRequiredService(viewModelType);
-        PageResolved?.Invoke(this, page);
         return page;
     }
-
-    public static event EventHandler<Page>? PageResolved;
 }
