@@ -63,49 +63,46 @@ public class NavigationBuilder(
         var parameters = new Dictionary<string, object>();
         var navType = fromRoot ? NavigationType.SetRoot : NavigationType.Push;
 
-        var configurableSegments = new Queue<Segment>(
-            this.segments.Where(s => s.ConfigureAction != null)
-        );
+        navigator.PrepareForProgrammaticNavigation(uri, navType, parameters);
+        await mainThread.InvokeOnMainThreadAsync(() => Shell.Current.GoToAsync(uri, true, parameters));
 
-        var tcs = configurableSegments.Count > 0
-            ? new TaskCompletionSource()
-            : null;
-
-        EventHandler<Page>? handler = null;
-        if (configurableSegments.Count > 0)
+        // Apply configure callbacks by walking the resulting navigation stack.
+        // The last N entries of NavigationStack correspond to the N pushed
+        // segments in chronological order. Avoids the static PageResolved event
+        // which was vulnerable to cross-navigation handler crosstalk when
+        // multiple Navigate() calls or NavigateTo<T> calls overlapped.
+        if (this.segments.Any(s => s.ConfigureAction != null))
         {
-            handler = (_, page) =>
+            var stack = Shell.Current.Navigation.NavigationStack;
+            for (var i = 0; i < this.segments.Count; i++)
             {
-                if (configurableSegments.Count == 0)
-                    return;
+                var seg = this.segments[i];
+                if (seg.ConfigureAction == null || seg.ViewModelType == null)
+                    continue;
 
-                var next = configurableSegments.Peek();
-                if (next.ViewModelType != null &&
-                    next.ViewModelType.IsInstanceOfType(page.BindingContext))
+                var stackIndex = stack.Count - this.segments.Count + i;
+                if (stackIndex < 0 || stackIndex >= stack.Count)
                 {
-                    configurableSegments.Dequeue();
-                    logger.LogDebug("Pre-Configuring ViewModel '{type}' via NavigationBuilder", next.ViewModelType);
-                    next.ConfigureAction!.DynamicInvoke(page.BindingContext);
-
-                    if (configurableSegments.Count == 0)
-                        tcs!.TrySetResult();
+                    logger.LogWarning(
+                        "NavigationBuilder segment '{route}' is out of NavigationStack bounds (index {index}, stack count {count})",
+                        seg.Route, stackIndex, stack.Count
+                    );
+                    continue;
                 }
-            };
-            ShinyRouteFactory.PageResolved += handler;
-        }
 
-        try
-        {
-            navigator.PrepareForProgrammaticNavigation(uri, navType, parameters);
-            await mainThread.InvokeOnMainThreadAsync(() => Shell.Current.GoToAsync(uri, true, parameters));
+                var page = stack[stackIndex];
+                if (!seg.ViewModelType.IsInstanceOfType(page.BindingContext))
+                {
+                    logger.LogWarning(
+                        "NavigationBuilder segment '{route}' expected BindingContext '{expected}' but found '{actual}'",
+                        seg.Route, seg.ViewModelType, page.BindingContext?.GetType()
+                    );
+                    continue;
+                }
 
-            if (tcs != null)
-                await tcs.Task.ConfigureAwait(false);
-        }
-        finally
-        {
-            if (handler != null)
-                ShinyRouteFactory.PageResolved -= handler;
+                logger.LogDebug("Configuring ViewModel '{type}' via NavigationBuilder", seg.ViewModelType);
+                seg.ConfigureAction.DynamicInvoke(page.BindingContext);
+            }
         }
     }
 
