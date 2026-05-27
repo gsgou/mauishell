@@ -7,7 +7,8 @@ public class ShinyShellNavigator(
     ILogger<ShinyShellNavigator> logger,
     IMainThread mainThread,
     ShinyAppBuilder navBuilder,
-    ShellTabBadgeManager tabBadgeManager
+    ShellTabBadgeManager tabBadgeManager,
+    ShellNavigationConfigurator configurator
 ) : INavigator, IMauiInitializeService, IDisposable
 {
     public event EventHandler<NavigationEventArgs>? Navigating;
@@ -158,21 +159,26 @@ public class ShinyShellNavigator(
         this.RaiseNavigating(Shell.Current, route, navType, parameters);
         this.isProgrammaticNavigation = true;
 
+        // Queue the configure callback so it can be applied to the resolved viewmodel
+        // BEFORE the target page's BindingContext is set — guaranteeing the property
+        // values are visible inside OnAppearing. Apply sites: ShinyRouteFactory (routed
+        // pages), ShinyShell.OnNavigated (ShellContent pages), AppOnPageAppearing
+        // (fallback). The subscription is disposed after navigation to roll the entry
+        // back if it was never consumed (e.g. nav failed mid-flight).
+        using var subscription = configure != null
+            ? configurator.Enqueue(configure)
+            : null;
+
         await mainThread.InvokeOnMainThreadAsync(() => Shell.Current.GoToAsync(route, true, parameters));
 
-        // Check the post-navigation page directly. Works uniformly for registered
-        // routes (BindingContext set by ShinyRouteFactory.GetOrCreate) and for
-        // ShellContent routes declared in AppShell.xaml (BindingContext set by
-        // ShinyShell.OnNavigated / AppOnPageAppearing). The previous approach
-        // awaited the static ShinyRouteFactory.PageResolved event, which never
-        // fires for ShellContent pages — leaking handlers that would later wake
-        // on an unrelated registered-route navigation and throw with a misleading
-        // "Page BindingContext is not of type ..." against the wrong target page.
         var page = Shell.Current.CurrentPage;
         if (page?.BindingContext is not TViewModel vm)
             throw new InvalidOperationException($"Page BindingContext is not of type '{typeof(TViewModel)}'");
 
-        configure?.Invoke(vm);
+        // Final safety net — if no apply site fired (e.g., a custom Shell subclass
+        // that bypasses ShinyShell.OnNavigated), apply now. May run after OnAppearing
+        // in that fallback case, but at minimum keeps the legacy behavior intact.
+        configurator.TryApply(vm);
     }
 
     
