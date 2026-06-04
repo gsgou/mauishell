@@ -35,7 +35,9 @@ public sealed class ShinyAppBuilder(MauiAppBuilder builder)
     /// </summary>
     /// <typeparam name="TDialog"></typeparam>
     /// <returns></returns>
-    public ShinyAppBuilder UseDialogs<TDialog>() where TDialog : class, IDialogs
+    public ShinyAppBuilder UseDialogs<
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TDialog
+    >() where TDialog : class, IDialogs
     {
         builder.Services.AddSingleton<IDialogs, TDialog>();
         return this;
