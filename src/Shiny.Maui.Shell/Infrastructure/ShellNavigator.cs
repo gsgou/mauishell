@@ -16,6 +16,8 @@ public class ShinyShellNavigator(
     IServiceProvider services = null!;
     Application application = null!;
 
+    internal IServiceProvider Services => this.services;
+
     record PendingNavigation(string ToUri, NavigationType NavigationType, IReadOnlyDictionary<string, object> Parameters);
     PendingNavigation? pendingNavigation;
     bool isProgrammaticNavigation;
@@ -98,7 +100,7 @@ public class ShinyShellNavigator(
 
 
     public INavigationBuilder CreateBuilder(bool fromRoot = false)
-        => new NavigationBuilder(this, navBuilder, mainThread, logger, fromRoot);
+        => new NavigationBuilder(this, navBuilder, configurator, mainThread, logger, fromRoot);
 
 
     internal void PrepareForProgrammaticNavigation(string uri, NavigationType navType, Dictionary<string, object> parameters)
@@ -159,26 +161,27 @@ public class ShinyShellNavigator(
         this.RaiseNavigating(Shell.Current, route, navType, parameters);
         this.isProgrammaticNavigation = true;
 
-        // Queue the configure callback so it can be applied to the resolved viewmodel
-        // BEFORE the target page's BindingContext is set — guaranteeing the property
-        // values are visible inside OnAppearing. Apply sites: ShinyRouteFactory (routed
-        // pages), ShinyShell.OnNavigated (ShellContent pages), AppOnPageAppearing
-        // (fallback). The subscription is disposed after navigation to roll the entry
-        // back if it was never consumed (e.g. nav failed mid-flight).
-        using var subscription = configure != null
-            ? configurator.Enqueue(configure)
-            : null;
+        // Resolve and configure the viewmodel BEFORE Shell.GoToAsync is awaited,
+        // then pin the instance on the configurator. The apply sites
+        // (ShinyRouteFactory.GetOrCreate for registered routes,
+        // ShinyShell.OnNavigated for ShellContent routes, and AppOnPageAppearing
+        // as a fallback) consume the pinned instance instead of resolving a
+        // fresh one. This eliminates the race where the post-await BindingContext
+        // check could run before either Shell.OnNavigated or PageAppearing fired
+        // (notably on Android cross-Section absolute navigation).
+        var vm = (TViewModel)services.GetRequiredService(typeof(TViewModel)!);
+        configure?.Invoke(vm);
+        using var subscription = configurator.EnqueueResolved(typeof(TViewModel), vm!);
 
         await mainThread.InvokeOnMainThreadAsync(() => Shell.Current.GoToAsync(route, true, parameters));
 
         var page = Shell.Current.CurrentPage;
-        if (page?.BindingContext is not TViewModel vm)
-            throw new InvalidOperationException($"Page BindingContext is not of type '{typeof(TViewModel)}'");
-
-        // Final safety net — if no apply site fired (e.g., a custom Shell subclass
-        // that bypasses ShinyShell.OnNavigated), apply now. May run after OnAppearing
-        // in that fallback case, but at minimum keeps the legacy behavior intact.
-        configurator.TryApply(vm);
+        if (!ReferenceEquals(page?.BindingContext, vm))
+            throw new InvalidOperationException(
+                $"Page BindingContext is not the pinned instance of '{typeof(TViewModel)}' " +
+                $"(found '{page?.BindingContext?.GetType().FullName ?? "null"}'). " +
+                $"Verify the target page is mapped via [ShellMap<TPage>] and the AppShell inherits ShinyShell."
+            );
     }
 
     
@@ -357,7 +360,10 @@ public class ShinyShellNavigator(
         var viewModelType = navBuilder.GetViewModelTypeForPage(page);
         if (viewModelType != null && (page.BindingContext == null || !viewModelType.IsInstanceOfType(page.BindingContext)))
         {
-            var vm = services.GetService(viewModelType);
+            // Prefer the pinned instance from a pending NavigateTo<TVm> /
+            // INavigationBuilder.Navigate call. Falls back to DI for the
+            // initial-page case where no programmatic navigation issued one.
+            var vm = configurator.TryConsume(viewModelType) ?? services.GetService(viewModelType);
             page.BindingContext = vm;
             logger.LogDebug("[Binding] ViewModel {type} set on page", viewModelType);
         }

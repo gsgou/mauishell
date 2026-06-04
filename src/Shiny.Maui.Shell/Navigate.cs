@@ -37,9 +37,31 @@ public sealed class NavigationParameter : BindableObject
 
 public static class Navigate
 {
+    static readonly Dictionary<Type, (Action<BindableObject, EventHandler> Attach, Action<BindableObject, EventHandler> Detach)> invokers = new();
+
+    public static void RegisterInvoker<T>(
+        Action<T, EventHandler> attach,
+        Action<T, EventHandler> detach
+    ) where T : BindableObject
+        => invokers[typeof(T)] = (
+            (b, h) => attach((T)b, h),
+            (b, h) => detach((T)b, h)
+        );
+
+    public static bool UnregisterInvoker<T>() where T : BindableObject
+        => invokers.Remove(typeof(T));
+
+
     static readonly BindableProperty ClickHandlerProperty = BindableProperty.CreateAttached(
         "ClickHandler",
         typeof(EventHandler),
+        typeof(Navigate),
+        null
+    );
+
+    static readonly BindableProperty NavigateGestureProperty = BindableProperty.CreateAttached(
+        "NavigateGesture",
+        typeof(TapGestureRecognizer),
         typeof(Navigate),
         null
     );
@@ -112,23 +134,38 @@ public static class Navigate
         EventHandler handler = async (_, _) => await ExecuteNavigation(bindable);
         bindable.SetValue(ClickHandlerProperty, handler);
 
+        if (TryGetInvoker(bindable, out var invoker))
+        {
+            invoker.Attach(bindable, handler);
+            return;
+        }
+
         switch (bindable)
         {
             case Button button:
                 button.Clicked += handler;
-                break;
+                return;
 
             case ToolbarItem toolbarItem:
                 toolbarItem.Clicked += handler;
-                break;
+                return;
 
             case MenuItem menuItem:
                 menuItem.Clicked += handler;
-                break;
+                return;
 
-            default:
-                throw new InvalidOperationException("Navigate.Route can only be used on Button, MenuItem, or ToolbarItem");
+            case View view:
+                var gesture = new TapGestureRecognizer();
+                gesture.Tapped += (s, _) => handler(s, EventArgs.Empty);
+                view.GestureRecognizers.Add(gesture);
+                bindable.SetValue(NavigateGestureProperty, gesture);
+                return;
         }
+
+        throw new InvalidOperationException(
+            $"Navigate.Route is not supported on {bindable.GetType().FullName}. " +
+            "Targets must be a Button, MenuItem, ToolbarItem, a View, or a type registered via Navigate.RegisterInvoker<T>."
+        );
     }
 
 
@@ -137,22 +174,51 @@ public static class Navigate
         if (bindable.GetValue(ClickHandlerProperty) is not EventHandler handler)
             return;
 
-        switch (bindable)
+        if (TryGetInvoker(bindable, out var invoker))
         {
-            case Button button:
-                button.Clicked -= handler;
-                break;
-
-            case ToolbarItem toolbarItem:
-                toolbarItem.Clicked -= handler;
-                break;
-
-            case MenuItem menuItem:
-                menuItem.Clicked -= handler;
-                break;
+            invoker.Detach(bindable, handler);
         }
+        else
+        {
+            switch (bindable)
+            {
+                case Button button:
+                    button.Clicked -= handler;
+                    break;
+
+                case ToolbarItem toolbarItem:
+                    toolbarItem.Clicked -= handler;
+                    break;
+
+                case MenuItem menuItem:
+                    menuItem.Clicked -= handler;
+                    break;
+            }
+
+            if (bindable is View view && bindable.GetValue(NavigateGestureProperty) is TapGestureRecognizer gesture)
+            {
+                view.GestureRecognizers.Remove(gesture);
+                bindable.ClearValue(NavigateGestureProperty);
+            }
+        }
+
         bindable.RemoveBinding(ClickHandlerProperty);
         bindable.ClearValue(ClickHandlerProperty);
+    }
+
+
+    static bool TryGetInvoker(
+        BindableObject bindable,
+        out (Action<BindableObject, EventHandler> Attach, Action<BindableObject, EventHandler> Detach) invoker
+    )
+    {
+        for (var type = bindable.GetType(); type != null && type != typeof(BindableObject); type = type.BaseType)
+        {
+            if (invokers.TryGetValue(type, out invoker))
+                return true;
+        }
+        invoker = default;
+        return false;
     }
 
 

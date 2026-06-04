@@ -5,6 +5,7 @@ namespace Shiny.Infrastructure;
 public class NavigationBuilder(
     ShinyShellNavigator navigator,
     ShinyAppBuilder navBuilder,
+    ShellNavigationConfigurator configurator,
     IMainThread mainThread,
     ILogger logger,
     bool fromRoot
@@ -63,21 +64,36 @@ public class NavigationBuilder(
         var parameters = new Dictionary<string, object>();
         var navType = fromRoot ? NavigationType.SetRoot : NavigationType.Push;
 
-        navigator.PrepareForProgrammaticNavigation(uri, navType, parameters);
-        await mainThread.InvokeOnMainThreadAsync(() => Shell.Current.GoToAsync(uri, true, parameters));
-
-        // Apply configure callbacks by walking the resulting navigation stack.
-        // The last N entries of NavigationStack correspond to the N pushed
-        // segments in chronological order. Avoids the static PageResolved event
-        // which was vulnerable to cross-navigation handler crosstalk when
-        // multiple Navigate() calls or NavigateTo<T> calls overlapped.
-        if (this.segments.Any(s => s.ConfigureAction != null))
+        // Pre-resolve each typed segment's viewmodel, apply its configure callback
+        // synchronously, and pin the instance on the configurator. The apply sites
+        // (ShinyRouteFactory.GetOrCreate, ShinyShell.OnNavigated, AppOnPageAppearing)
+        // consume the pinned instances in FIFO + type order matching the order Shell
+        // realises each segment's page. No post-await stack walk is required because
+        // the configure callbacks have already run before any page is constructed.
+        var subscriptions = new List<IDisposable>(this.segments.Count);
+        try
         {
+            foreach (var seg in this.segments)
+            {
+                if (seg.ViewModelType == null)
+                    continue;
+
+                var vm = navigator.Services.GetRequiredService(seg.ViewModelType);
+                seg.ConfigureAction?.DynamicInvoke(vm);
+                subscriptions.Add(configurator.EnqueueResolved(seg.ViewModelType, vm));
+            }
+
+            navigator.PrepareForProgrammaticNavigation(uri, navType, parameters);
+            await mainThread.InvokeOnMainThreadAsync(() => Shell.Current.GoToAsync(uri, true, parameters));
+
+            // Validate the resulting stack matches what we pinned. Warnings only —
+            // a mismatch here indicates a misconfigured ShellMap or a Shell quirk,
+            // not a recoverable runtime condition.
             var stack = Shell.Current.Navigation.NavigationStack;
             for (var i = 0; i < this.segments.Count; i++)
             {
                 var seg = this.segments[i];
-                if (seg.ConfigureAction == null || seg.ViewModelType == null)
+                if (seg.ViewModelType == null)
                     continue;
 
                 var stackIndex = stack.Count - this.segments.Count + i;
@@ -97,12 +113,13 @@ public class NavigationBuilder(
                         "NavigationBuilder segment '{route}' expected BindingContext '{expected}' but found '{actual}'",
                         seg.Route, seg.ViewModelType, page.BindingContext?.GetType()
                     );
-                    continue;
                 }
-
-                logger.LogDebug("Configuring ViewModel '{type}' via NavigationBuilder", seg.ViewModelType);
-                seg.ConfigureAction.DynamicInvoke(page.BindingContext);
             }
+        }
+        finally
+        {
+            foreach (var sub in subscriptions)
+                sub.Dispose();
         }
     }
 

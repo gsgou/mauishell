@@ -22,26 +22,20 @@ public class ShinyShell : Shell
         if (viewModelType == null)
             return;
 
-        var configurator = services.GetService<ShellNavigationConfigurator>();
-
         // BindingContext inherits down the visual tree, so it may be the Shell
         // instance rather than null — check if it's already the correct ViewModel
         if (page.BindingContext != null && viewModelType.IsInstanceOfType(page.BindingContext))
         {
-            // Page already bound (e.g., the route factory resolved it earlier).
-            // Apply any still-pending configure callback so re-navigations to the
-            // same VM instance also get property updates before OnAppearing.
-            configurator?.TryApply(page.BindingContext);
+            // Page already bound (e.g., ShinyRouteFactory resolved it earlier
+            // in the same navigation, or this OnNavigated fires after PageAppearing).
             return;
         }
 
-        var vm = services.GetService(viewModelType);
-        if (vm != null)
-        {
-            // Apply pending configure BEFORE BindingContext is set so OnAppearing
-            // observes a fully configured viewmodel.
-            configurator?.TryApply(vm);
-        }
+        // Prefer the pinned instance from a pending NavigateTo<TVm> /
+        // INavigationBuilder.Navigate call. Falls back to DI for the initial-page
+        // case where no programmatic navigation issued one.
+        var configurator = services.GetService<ShellNavigationConfigurator>();
+        var vm = configurator?.TryConsume(viewModelType) ?? services.GetService(viewModelType);
         page.BindingContext = vm;
     }
 }

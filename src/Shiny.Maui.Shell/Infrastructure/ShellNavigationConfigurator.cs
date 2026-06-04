@@ -1,42 +1,71 @@
 namespace Shiny.Infrastructure;
 
 /// <summary>
-/// Holds pending viewmodel-configuration callbacks supplied by
-/// <see cref="INavigator.NavigateTo{TViewModel}"/> so that property values can be
-/// applied to the resolved viewmodel BEFORE
-/// <see cref="IPageLifecycleAware.OnAppearing"/> fires.
+/// Holds pre-resolved viewmodel instances queued by
+/// <see cref="INavigator.NavigateTo{TViewModel}"/> and
+/// <see cref="INavigationBuilder.Navigate"/> so that the apply sites
+/// (<c>ShinyRouteFactory.GetOrCreate</c>, <see cref="ShinyShell"/>'s
+/// <c>OnNavigated</c>, and <c>ShinyShellNavigator.AppOnPageAppearing</c>)
+/// bind the same instance the navigator pinned, instead of resolving a
+/// fresh instance from DI on each path.
 /// </summary>
 /// <remarks>
-/// Entries are stored as a single linked-list queue. <see cref="TryApply"/>
-/// consumes the first entry whose declared type is assignable from the
-/// viewmodel being bound, which makes interleaved navigations to different
-/// viewmodel types safe — each type pops its own FIFO entry without disturbing
-/// the others. Same-type rapid navigations stay FIFO, which produces the same
-/// observable state per page since each viewmodel instance is configured exactly
-/// once with one of the queued actions.
+/// Pinning the viewmodel before <c>Shell.GoToAsync</c> is awaited eliminates
+/// the race where the navigator's post-await BindingContext check could fire
+/// before <c>Shell.OnNavigated</c> or <c>Application.PageAppearing</c> ran
+/// (most visibly on Android cross-Section absolute navigation between
+/// <c>ShellContent</c>-declared routes).
 ///
-/// <see cref="Enqueue"/> returns an <see cref="IDisposable"/> the navigator
-/// must dispose after the navigation completes — if the entry has not yet been
-/// applied (e.g. the navigation threw), <see cref="IDisposable.Dispose"/>
+/// Entries are stored as a FIFO linked-list queue. <see cref="TryConsume"/>
+/// pops the first entry whose declared type is assignable from the requested
+/// viewmodel type, so interleaved navigations to different viewmodel types
+/// don't disturb each other. Same-type rapid navigations stay FIFO.
+///
+/// <see cref="EnqueueResolved{T}"/> (and the non-generic
+/// <see cref="EnqueueResolved(Type, object)"/>) return an
+/// <see cref="IDisposable"/> the navigator must dispose after navigation
+/// completes — if the entry has not yet been consumed (e.g. the navigation
+/// threw before an apply site fired), <see cref="IDisposable.Dispose"/>
 /// removes it from the queue so it cannot leak onto a later, unrelated
 /// navigation to the same type.
 /// </remarks>
 public class ShellNavigationConfigurator
 {
     readonly Lock sync = new();
-    readonly LinkedList<PendingConfigure> queue = new();
+    readonly LinkedList<PendingResolved> queue = new();
 
     /// <summary>
-    /// Enqueues a configuration callback for the next viewmodel of type
-    /// <typeparamref name="T"/> bound by Shiny's navigation pipeline.
-    /// Dispose the returned handle once the navigation has finished to roll
+    /// Applies <paramref name="configure"/> to <paramref name="instance"/>
+    /// synchronously, then queues the instance for the next apply site that
+    /// resolves a viewmodel assignable from <typeparamref name="T"/>.
+    /// Dispose the returned handle after the navigation has finished to roll
     /// back the entry if it was never applied.
     /// </summary>
-    public IDisposable Enqueue<T>(Action<T> configure)
+    public IDisposable EnqueueResolved<T>(T instance, Action<T>? configure = null) where T : class
     {
-        ArgumentNullException.ThrowIfNull(configure);
-        var entry = new PendingConfigure(typeof(T), obj => configure((T)obj));
-        LinkedListNode<PendingConfigure> node;
+        ArgumentNullException.ThrowIfNull(instance);
+
+        // Configure synchronously so every apply site and every lifecycle
+        // hook downstream (OnAppearing, INPC subscribers) observes a fully
+        // initialised viewmodel. If the callback throws, nothing is enqueued
+        // and the exception propagates to the navigator caller.
+        configure?.Invoke(instance);
+
+        return this.EnqueueResolved(typeof(T), instance);
+    }
+
+    /// <summary>
+    /// Non-generic counterpart to <see cref="EnqueueResolved{T}"/> for code
+    /// paths (e.g. <see cref="INavigationBuilder"/>) that hold the viewmodel
+    /// type as a runtime <see cref="Type"/>.
+    /// </summary>
+    public IDisposable EnqueueResolved(Type viewModelType, object instance)
+    {
+        ArgumentNullException.ThrowIfNull(viewModelType);
+        ArgumentNullException.ThrowIfNull(instance);
+
+        var entry = new PendingResolved(viewModelType, instance);
+        LinkedListNode<PendingResolved> node;
         lock (this.sync)
             node = this.queue.AddLast(entry);
 
@@ -44,44 +73,42 @@ public class ShellNavigationConfigurator
     }
 
     /// <summary>
-    /// Applies the first queued callback whose declared type is assignable
-    /// from <paramref name="viewModel"/>. Returns <c>true</c> when a callback
-    /// was applied and removed from the queue.
+    /// Pops and returns the first queued viewmodel whose declared type is
+    /// assignable from <paramref name="viewModelType"/>. Returns <c>null</c>
+    /// when no entry matches (e.g., the initial-page case where the user
+    /// never called <see cref="INavigator.NavigateTo{TViewModel}"/>).
     /// </summary>
-    public bool TryApply(object viewModel)
+    public object? TryConsume(Type viewModelType)
     {
-        ArgumentNullException.ThrowIfNull(viewModel);
-        Action<object>? toApply = null;
+        ArgumentNullException.ThrowIfNull(viewModelType);
 
         lock (this.sync)
         {
             var node = this.queue.First;
             while (node != null)
             {
-                if (node.Value.Type.IsInstanceOfType(viewModel))
+                if (node.Value.Type.IsAssignableFrom(viewModelType))
                 {
-                    toApply = node.Value.Apply;
+                    var instance = node.Value.Instance;
                     this.queue.Remove(node);
-                    break;
+                    return instance;
                 }
                 node = node.Next;
             }
         }
-
-        toApply?.Invoke(viewModel);
-        return toApply != null;
+        return null;
     }
 
-    /// <summary>Discards every pending callback.</summary>
+    /// <summary>Discards every pending entry.</summary>
     public void Clear()
     {
         lock (this.sync)
             this.queue.Clear();
     }
 
-    record PendingConfigure(Type Type, Action<object> Apply);
+    record PendingResolved(Type Type, object Instance);
 
-    sealed class Subscription(ShellNavigationConfigurator owner, LinkedListNode<PendingConfigure> node) : IDisposable
+    sealed class Subscription(ShellNavigationConfigurator owner, LinkedListNode<PendingResolved> node) : IDisposable
     {
         bool disposed;
 
@@ -93,9 +120,9 @@ public class ShellNavigationConfigurator
 
             lock (owner.sync)
             {
-                // Node may already have been removed by TryApply; check List
-                // ownership before attempting removal (LinkedListNode.List is
-                // null once detached).
+                // Node may already have been removed by TryConsume; check
+                // List ownership before attempting removal
+                // (LinkedListNode.List is null once detached).
                 if (node.List == owner.queue)
                     owner.queue.Remove(node);
             }
