@@ -161,27 +161,44 @@ public class ShinyShellNavigator(
         this.RaiseNavigating(Shell.Current, route, navType, parameters);
         this.isProgrammaticNavigation = true;
 
-        // Resolve and configure the viewmodel BEFORE Shell.GoToAsync is awaited,
-        // then pin the instance on the configurator. The apply sites
+        // Resolve and configure the viewmodel synchronously. Pin the instance
+        // on the configurator so whichever apply site fires
         // (ShinyRouteFactory.GetOrCreate for registered routes,
-        // ShinyShell.OnNavigated for ShellContent routes, and AppOnPageAppearing
-        // as a fallback) consume the pinned instance instead of resolving a
-        // fresh one. This eliminates the race where the post-await BindingContext
-        // check could run before either Shell.OnNavigated or PageAppearing fired
-        // (notably on Android cross-Section absolute navigation).
+        // ShinyShell.OnNavigated for ShellContent routes, or AppOnPageAppearing
+        // as a fallback) consumes our instance instead of resolving a fresh one
+        // from DI. The configure callback runs before pinning so every downstream
+        // hook — including IPageLifecycleAware.OnAppearing on whatever schedule
+        // Shell decides to fire it — observes a fully initialised viewmodel.
         var vm = (TViewModel)services.GetRequiredService(typeof(TViewModel)!);
         configure?.Invoke(vm);
-        using var subscription = configurator.EnqueueResolved(typeof(TViewModel), vm!);
+        var subscription = configurator.EnqueueResolved(typeof(TViewModel), vm!);
 
-        await mainThread.InvokeOnMainThreadAsync(() => Shell.Current.GoToAsync(route, true, parameters));
-
-        var page = Shell.Current.CurrentPage;
-        if (!ReferenceEquals(page?.BindingContext, vm))
-            throw new InvalidOperationException(
-                $"Page BindingContext is not the pinned instance of '{typeof(TViewModel)}' " +
-                $"(found '{page?.BindingContext?.GetType().FullName ?? "null"}'). " +
-                $"Verify the target page is mapped via [ShellMap<TPage>] and the AppShell inherits ShinyShell."
-            );
+        try
+        {
+            // Fire the navigation. GoToAsync throws synchronously for an unknown
+            // route, which surfaces as the awaited Task's exception — the only
+            // failure mode the navigator needs to report. After the awaiter
+            // resolves we deliberately don't probe Shell.Current.CurrentPage:
+            // on Android the awaiter can resolve before Shell's CurrentItem
+            // chain updates and before Shell.OnNavigated / PageAppearing fire,
+            // so a post-await BindingContext check races against Shell's own
+            // scheduling. The pinned viewmodel + apply-site model handles
+            // that timing naturally — once Shell raises PageAppearing for the
+            // target page (immediately, or on the next dispatcher tick), the
+            // apply site consumes the pinned instance and binds it before
+            // OnAppearing runs.
+            await mainThread.InvokeOnMainThreadAsync(() => Shell.Current.GoToAsync(route, true, parameters));
+        }
+        catch
+        {
+            // Only roll back the pinned entry when navigation actually failed.
+            // On success we leave it pinned because the apply site has not yet
+            // fired (typically runs on the next dispatcher tick) and disposing
+            // would cause it to fall back to a fresh DI resolve, throwing away
+            // our configured instance.
+            subscription.Dispose();
+            throw;
+        }
     }
 
     

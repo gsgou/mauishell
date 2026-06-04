@@ -71,55 +71,31 @@ public class NavigationBuilder(
         // realises each segment's page. No post-await stack walk is required because
         // the configure callbacks have already run before any page is constructed.
         var subscriptions = new List<IDisposable>(this.segments.Count);
+        foreach (var seg in this.segments)
+        {
+            if (seg.ViewModelType == null)
+                continue;
+
+            var vm = navigator.Services.GetRequiredService(seg.ViewModelType);
+            seg.ConfigureAction?.DynamicInvoke(vm);
+            subscriptions.Add(configurator.EnqueueResolved(seg.ViewModelType, vm));
+        }
+
+        navigator.PrepareForProgrammaticNavigation(uri, navType, parameters);
+
         try
         {
-            foreach (var seg in this.segments)
-            {
-                if (seg.ViewModelType == null)
-                    continue;
-
-                var vm = navigator.Services.GetRequiredService(seg.ViewModelType);
-                seg.ConfigureAction?.DynamicInvoke(vm);
-                subscriptions.Add(configurator.EnqueueResolved(seg.ViewModelType, vm));
-            }
-
-            navigator.PrepareForProgrammaticNavigation(uri, navType, parameters);
             await mainThread.InvokeOnMainThreadAsync(() => Shell.Current.GoToAsync(uri, true, parameters));
-
-            // Validate the resulting stack matches what we pinned. Warnings only —
-            // a mismatch here indicates a misconfigured ShellMap or a Shell quirk,
-            // not a recoverable runtime condition.
-            var stack = Shell.Current.Navigation.NavigationStack;
-            for (var i = 0; i < this.segments.Count; i++)
-            {
-                var seg = this.segments[i];
-                if (seg.ViewModelType == null)
-                    continue;
-
-                var stackIndex = stack.Count - this.segments.Count + i;
-                if (stackIndex < 0 || stackIndex >= stack.Count)
-                {
-                    logger.LogWarning(
-                        "NavigationBuilder segment '{route}' is out of NavigationStack bounds (index {index}, stack count {count})",
-                        seg.Route, stackIndex, stack.Count
-                    );
-                    continue;
-                }
-
-                var page = stack[stackIndex];
-                if (!seg.ViewModelType.IsInstanceOfType(page.BindingContext))
-                {
-                    logger.LogWarning(
-                        "NavigationBuilder segment '{route}' expected BindingContext '{expected}' but found '{actual}'",
-                        seg.Route, seg.ViewModelType, page.BindingContext?.GetType()
-                    );
-                }
-            }
         }
-        finally
+        catch
         {
+            // Only roll back pinned entries when navigation actually failed.
+            // On success we leave them pinned because the apply sites typically
+            // fire on the next dispatcher tick (notably on Android), and
+            // disposing here would cause them to fall back to a fresh DI resolve.
             foreach (var sub in subscriptions)
                 sub.Dispose();
+            throw;
         }
     }
 

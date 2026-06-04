@@ -129,15 +129,30 @@ public class NavigatorContractTests
     }
 
     [Fact]
-    public void NavigationBuilder_WalksNavigationStackToApplyConfigureCallbacks()
+    public void NavigationBuilder_PinsResolvedViewModelsToConfigurator()
     {
         var source = ReadInfrastructureSource("NavigationBuilder.cs");
 
-        source.ShouldContain("Shell.Current.Navigation.NavigationStack",
+        source.ShouldContain("configurator.EnqueueResolved",
             customMessage:
-            "NavigationBuilder.Navigate must walk Shell.Current.Navigation.NavigationStack to locate each " +
-            "segment's page and apply its configure callback. This is the replacement for the broken " +
-            "static-event flow and is the only path that does not crosstalk with concurrent navigations."
+            "NavigationBuilder.Navigate must pre-resolve each typed segment's viewmodel, apply its configure " +
+            "callback synchronously, and pin the instance on ShellNavigationConfigurator via EnqueueResolved. " +
+            "The apply sites (ShinyRouteFactory.GetOrCreate, ShinyShell.OnNavigated, AppOnPageAppearing) consume " +
+            "the pinned instances when Shell realises each segment's page. This replaces the v6.1 stack-walk " +
+            "approach which raced against Shell's PageAppearing scheduling on Android."
+        );
+    }
+
+    [Fact]
+    public void NavigationBuilder_RollsBackPinnedEntriesOnlyOnFailure()
+    {
+        var source = ReadInfrastructureSource("NavigationBuilder.cs");
+
+        source.ShouldNotContain("finally",
+            customMessage:
+            "NavigationBuilder must not unconditionally dispose pinned subscriptions in a finally block — " +
+            "on Android the apply sites fire after Navigate returns, so disposing on success would cause " +
+            "fallback DI resolves and lose configured viewmodels. Dispose only inside a catch block."
         );
     }
 }
